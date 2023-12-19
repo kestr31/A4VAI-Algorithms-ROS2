@@ -7,8 +7,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.clock import Clock
 from rclpy.qos import qos_profile_sensor_data
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
-
+from std_msgs.msg import Float64MultiArray
 
 #.. PX4 libararies - sub.
 from px4_msgs.msg import EstimatorStates
@@ -31,13 +30,10 @@ from .utility_functions import DCM_from_euler_angle
 
 
 
-class TestAttitudeControlNode(Node):
+class Node_GPR_Output(Node):
     
     def __init__(self):
-        super().__init__('test_attitude_control_node')
-        
-        # self.OffboardGroup = MutuallyExclusiveCallbackGroup()
-        self.MPPIGroup = MutuallyExclusiveCallbackGroup()
+        super().__init__('node_GPR_output')
         
         #.. Reference        
         #   [1]: https://docs.px4.io/main/en/msg_docs/vehicle_command.html
@@ -56,14 +52,17 @@ class TestAttitudeControlNode(Node):
             EstimatorStates         =   '/fmu/out/estimator_states'
             HoverThrustEstimate     =   '/fmu/out/hover_thrust_estimate'
                     
-        #.. publishers - from ROS2 msgs to px4 msgs
-        self.vehicle_command_publisher_             =   self.create_publisher(VehicleCommand, msg_mapping_ros2_to_px4.VehicleCommand, 10)
-        self.offboard_control_mode_publisher_       =   self.create_publisher(OffboardControlMode, msg_mapping_ros2_to_px4.OffboardControlMode , 10)
-        self.trajectory_setpoint_publisher_         =   self.create_publisher(TrajectorySetpoint, msg_mapping_ros2_to_px4.TrajectorySetpoint, 10)
-        self.vehicle_attitude_setpoint_publisher_   =   self.create_publisher(VehicleAttitudeSetpoint, msg_mapping_ros2_to_px4.VehicleAttitudeSetpoint, 10)        
+        # #.. publishers - from ROS2 msgs to px4 msgs
+        # self.vehicle_command_publisher_             =   self.create_publisher(VehicleCommand, msg_mapping_ros2_to_px4.VehicleCommand, 10)
+        # self.offboard_control_mode_publisher_       =   self.create_publisher(OffboardControlMode, msg_mapping_ros2_to_px4.OffboardControlMode , 10)
+        # self.trajectory_setpoint_publisher_         =   self.create_publisher(TrajectorySetpoint, msg_mapping_ros2_to_px4.TrajectorySetpoint, 10)
+        # self.vehicle_attitude_setpoint_publisher_   =   self.create_publisher(VehicleAttitudeSetpoint, msg_mapping_ros2_to_px4.VehicleAttitudeSetpoint, 10)        
         #.. subscriptions - from px4 msgs to ROS2 msgs
         self.estimator_states_subscription          =   self.create_subscription(EstimatorStates, msg_mapping_ros2_to_px4.EstimatorStates, self.subscript_estimator_states, qos_profile_sensor_data)
         self.hover_thrust_estimate_subscription     =   self.create_subscription(HoverThrustEstimate, msg_mapping_ros2_to_px4.HoverThrustEstimate, self.subscript_hover_thrust_estimate, qos_profile_sensor_data)
+
+        #.. publishers - from ROS2 msgs to ROS2 msgs
+        self.GPR_output_publisher_     =   self.create_publisher(Float64MultiArray, 'topic_name_GPR_output', 10)
 
         #.. parameter - vehicle command 
         class prm_msg_veh_com:
@@ -97,23 +96,7 @@ class TestAttitudeControlNode(Node):
                 self.body_rate       =   False
                 
         self.prm_off_con_mod            =   prm_msg_off_con_mod()
-        # self.prm_off_con_mod.position   =   True
         self.prm_off_con_mod.attitude   =   True
-        # True
-        
-        #.. variable - trajectory setpoint 
-        class msg_trj_set:
-            def __init__(self):
-                self.pos_NED    =   np.NaN * np.ones(3)
-                self.yaw_rad    =   np.NaN
-                # self.vel_NED    =   np.NaN * np.ones(3)
-                # self.yawspeed_rad   =   np.NaN
-                # self.acc_NED    =   np.NaN * np.ones(3)
-                # self.jerk_NED   =   np.NaN * np.ones(3)
-                # self.thrust_NED =   np.NaN * np.ones(3)
-                
-        self.trj_set    =   msg_trj_set()
-        
         
         #.. variable - vehicle attitude setpoint
         class msg_veh_att_set:
@@ -141,28 +124,26 @@ class TestAttitudeControlNode(Node):
         self.eul_ang_deg    =   np.zeros(3)
         self.windvel_NE     =   np.zeros(2)
                 
-        # callback test_attitude_control
+        # callback main_attitude_control
         period_offboard_att_ctrl    =   0.004
-        self.timer  =   self.create_timer(period_offboard_att_ctrl, self.test_attitude_control)
-        # self.timer  =   self.create_timer(period_offboard_att_ctrl, self.test_attitude_control, callback_group = self.OffboardGroup)
+        self.timer  =   self.create_timer(period_offboard_att_ctrl, self.main_attitude_control)
         
         # callback offboard_control_mode
         # offboard counter in [3]
         period_offboard_control_mode    =   0.2
         self.timer  =   self.create_timer(period_offboard_control_mode, self.offboard_control_mode)
-        # self.timer  =   self.create_timer(period_offboard_control_mode, self.offboard_control_mode, callback_group = self.OffboardGroup)
         self.prm_offboard_setpoint_counter_start_flight  =   m.ceil(2/period_offboard_control_mode)
         self.offboard_setpoint_counter_     =   0
         
-        # callback test_attitude_control
+        # callback PF_MPPI_param
         period_MPPI_param       =   0.05
-        self.timer  =   self.create_timer(period_MPPI_param, self.PF_MPPI_param, callback_group = self.MPPIGroup)
+        self.timer  =   self.create_timer(period_MPPI_param, self.PF_MPPI_param)
         
         ###### - start - Vars. for PF algorithm ######
         #.. declare variables/instances
         self.Q6     =   Quadrotor_6DOF()
         self.Q6.dt_GCU  =   period_offboard_att_ctrl
-        self.Guid_type  =   1           # | 0: PD control | 1: guidance law | 2: MPPI direct accel cmd | 3: MPPI guidance-based |
+        self.Q6.Guid_type  =   3           # | 0: PD control | 1: guidance law | 2: MPPI direct accel cmd | 3: MPPI guidance-based |
         
         self.VT     =   Virtual_Target()
         
@@ -196,6 +177,7 @@ class TestAttitudeControlNode(Node):
         self.MG.set_MPPI_entropy_calc_code()
         
         self.MPPI_ctrl_input = np.array([self.MP.u1_init, self.MP.u2_init, self.MP.u3_init])
+        print(self.MPPI_ctrl_input)
                 
         #.. hover_thrust
         self.hover_thrust = 0.75
@@ -204,16 +186,16 @@ class TestAttitudeControlNode(Node):
         
     ### main function
     def offboard_control_mode(self):
-        if self.offboard_setpoint_counter_ == self.prm_offboard_setpoint_counter_start_flight:
-            # print("----- debug point [1] -----")
+        # if self.offboard_setpoint_counter_ == self.prm_offboard_setpoint_counter_start_flight:
+        #     # print("----- debug point [1] -----")
             
-            # offboard mode cmd
-            self.publish_vehicle_command(self.prm_offboard_mode)
-            # arm cmd
-            self.publish_vehicle_command(self.prm_arm_mode)
+        #     # offboard mode cmd
+        #     self.publish_vehicle_command(self.prm_offboard_mode)
+        #     # arm cmd
+        #     self.publish_vehicle_command(self.prm_arm_mode)
             
-        # set offboard cntrol mode 
-        self.publish_offboard_control_mode(self.prm_off_con_mod)
+        # # set offboard cntrol mode 
+        # self.publish_offboard_control_mode(self.prm_off_con_mod)
             
         # count offboard_setpoint_counter_
         if self.offboard_setpoint_counter_ < self.prm_offboard_setpoint_counter_start_flight:
@@ -230,8 +212,8 @@ class TestAttitudeControlNode(Node):
         pass
     
     
-    #.. test_attitude_control 
-    def test_attitude_control(self):
+    #.. main_attitude_control 
+    def main_attitude_control(self):
         
         #.. variable setting
         self.Q6.Ri  =   self.pos_NED
@@ -287,7 +269,7 @@ class TestAttitudeControlNode(Node):
         self.veh_att_set.thrust_body    =   [0., 0., -norm_thrust_cmd]
         
         self.veh_att_set.q_d            =   [w, x, y, z]
-        self.publisher_vehicle_attitude_setpoint(self.veh_att_set)
+        # self.publisher_vehicle_attitude_setpoint(self.veh_att_set)
         
         pass
     
@@ -296,7 +278,8 @@ class TestAttitudeControlNode(Node):
         #.. MPPI algorithm
         MPPI_ctrl_input1, MPPI_ctrl_input2    =   self.MG.run_MPPI_Guidance(self.Q6, self.WP.WPs, self.VT)
         self.MPPI_ctrl_input    =   MPPI_ctrl_input1.copy()
-        print("MPPI: [0]=" + str(self.MPPI_ctrl_input[0]) + ", [1]=" + str(self.MPPI_ctrl_input[1]) + ", [2]=" + str(self.MPPI_ctrl_input[2]))
+        self.publish_GPR_output()
+        # print("MPPI: [0]=" + str(self.MPPI_ctrl_input[0]) + ", [1]=" + str(self.MPPI_ctrl_input[1]) + ", [2]=" + str(self.MPPI_ctrl_input[2]))
         pass
     
     
@@ -362,6 +345,17 @@ class TestAttitudeControlNode(Node):
         self.vehicle_attitude_setpoint_publisher_.publish(msg)
         
         pass
+
+    #.. publish_GPR_output
+    def publish_GPR_output(self):
+        msg                 =   Float64MultiArray()
+        msg.data            =   [self.MPPI_ctrl_input[0], self.MPPI_ctrl_input[1], self.MPPI_ctrl_input[2]]
+        self.GPR_output_publisher_.publish(msg)
+        self.get_logger().info('pub msgs: {0}'.format(msg.data))
+        self.get_logger().info("subscript_GPR_output: [0]=" + str(self.MPPI_ctrl_input[0]) +", [1]=" + str(self.MPPI_ctrl_input[1]) +", [2]=" + str(self.MPPI_ctrl_input[2]))
+        pass
+        
+    
         
     ### subscriptions        
     #.. subscript subscript_estimator_states
@@ -421,12 +415,12 @@ class TestAttitudeControlNode(Node):
         
 def main(args=None):
     print("======================================================")
-    print("------------- main() in test_att_ctrl.py -------------")
+    print("------------- main() in node_GPR_output.py -------------")
     print("======================================================")
     rclpy.init(args=args)
-    TestAttitudeControl = TestAttitudeControlNode()
-    rclpy.spin(TestAttitudeControl)
-    TestAttitudeControl.destroy_node()
+    GPR_Output = Node_GPR_Output()
+    rclpy.spin(GPR_Output)
+    GPR_Output.destroy_node()
     rclpy.shutdown()
     pass
 if __name__ == '__main__':
