@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'alg1_1 = a4vai.alg1.script1:main',
+            'test_att_ctrl = a4vai.pathFollowing.test_att_ctrl:main',
             'alg1_2 = a4vai.alg1.script2:main'
         ],
     },

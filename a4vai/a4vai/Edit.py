@@ -65,6 +65,12 @@ class TestAttitudeControlNode(Node):
         self.estimator_states_subscription          =   self.create_subscription(EstimatorStates, msg_mapping_ros2_to_px4.EstimatorStates, self.subscript_estimator_states, qos_profile_sensor_data)
         self.hover_thrust_estimate_subscription     =   self.create_subscription(HoverThrustEstimate, msg_mapping_ros2_to_px4.HoverThrustEstimate, self.subscript_hover_thrust_estimate, qos_profile_sensor_data)
 
+
+
+
+###########################################################################################################################################################################
+
+
         #.. parameter - vehicle command 
         class prm_msg_veh_com:
             def __init__(self):
@@ -87,6 +93,8 @@ class TestAttitudeControlNode(Node):
         self.prm_offboard_mode.params[0]  =   1
         self.prm_offboard_mode.params[1]  =   6
         
+
+
         #.. parameter - offboard control mode
         class prm_msg_off_con_mod:
             def __init__(self):        
@@ -99,8 +107,19 @@ class TestAttitudeControlNode(Node):
         self.prm_off_con_mod            =   prm_msg_off_con_mod()
         # self.prm_off_con_mod.position   =   True
         self.prm_off_con_mod.attitude   =   True
-        # True
+        self.prm_off_con_mod.velocity   =   True
         
+
+
+###########################################################################################################################################################################
+
+
+
+
+
+
+
+
         #.. variable - trajectory setpoint 
         class msg_trj_set:
             def __init__(self):
