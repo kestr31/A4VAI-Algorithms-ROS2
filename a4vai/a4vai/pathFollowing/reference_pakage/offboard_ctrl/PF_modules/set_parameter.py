@@ -19,17 +19,28 @@ class Way_Point():
     def __init__(self,wp_type_selection) -> None:
         #.. straight line
         if wp_type_selection == 0:
-            d       =   25.
-            self.WPs     =   np.array([ [0, 0, -10], [d, d, -10] ])
+            d       =   150.
+            h1      =   10.
+            wp0     =   5.
+            self.WPs     =   np.array([ [0, 0, -h1], [wp0, 0., -h1], [d-wp0, 0., -h1], [d, 0., -h1] ])
         #.. rectangle
         elif wp_type_selection == 1:
-            d       =   25.     # 25.
+            # d       =   25.     # 25.
+            d       =   35.     # 25.
+            # d       =   45.     # 25.
             wp0     =   5.
             h1      =   10.
             h2      =   10.
+            
+            # self.WPs     =   np.array([ [0, 0, -h1],
+            #                     [wp0, wp0, -h1], [wp0 + 10, wp0, -h1], [wp0 + d, wp0, -h2], [wp0 + d, wp0 + d, -h1], [wp0, wp0 + d, -h2], [wp0, wp0, -h1], 
+            #                     [0, 0, -h1]])
+            
             self.WPs     =   np.array([ [0, 0, -h1],
                                 [wp0, wp0, -h1], [wp0 + d, wp0, -h2], [wp0 + d, wp0 + d, -h1], [wp0, wp0 + d, -h2], [wp0, wp0, -h1], 
                                 [0, 0, -h1]])
+            
+            
         #.. circle
         elif wp_type_selection == 2:
             # param.
@@ -81,9 +92,13 @@ class MPPI_Guidance_Parameter():
         self.Q_lim_margin = np.array([0.9])
         self.Q_lim  =   np.array([0.5])
         self.a_lim  =   1.0
-        self.Q      =   np.array([0.2, 0.02, 10.0, 0.0])
+        # self.Q      =   np.array([0.2, 0.02, 10.0, 0.0])
+        # self.Q      =   np.array([0.05, 0.02, 0.2, 0.0])
+        # self.Q      =   np.array([0.05, 0.02, 0.5, 0.0])
+        self.Q      =   np.array([0.05, 0.02, 2.0, 0.0])
         self.R      =   np.array([0.001, 0.001, 0.001])
-        self.K      =   2**8        # 7 vs. 11
+        self.K      =   2**8
+        # self.K      =   2**9
         
         if MPPI_type_selection == 2:
             #.. cost
@@ -112,16 +127,18 @@ class MPPI_Guidance_Parameter():
             self.dt     =   0.04
             self.N      =   100
             self.nu     =   1000.
-            #.. u1: LAD, u2: desired_speed, u3: eta
-            self.var1   =   1.0 * 1.0           # 0.2
+            # #.. u1: LAD, u2: desired_speed, u3: eta
+            # self.var1   =   1.0 * 0.7           # 0.2
+            self.var1   =   1.0 * 0.5           # 0.2
+            
             self.var2   =   self.var1
             self.var3   =   self.var1
             self.lamb1  =   1.0 *1.0           # 1.0
             self.lamb2  =   self.lamb1
             self.lamb3  =   self.lamb1
-            self.u1_init    =   1.
-            self.u2_init    =   1.
-            self.u3_init    =   3.
+            self.u1_init    =   3.0
+            self.u2_init    =   2.0
+            self.u3_init    =   2.
             
         
         #.. no use MPPI module

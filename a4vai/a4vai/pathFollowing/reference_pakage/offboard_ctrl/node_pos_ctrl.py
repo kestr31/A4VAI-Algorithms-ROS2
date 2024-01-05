@@ -7,43 +7,41 @@ import rclpy
 from rclpy.node import Node
 from rclpy.clock import Clock
 from rclpy.qos import qos_profile_sensor_data
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Int32MultiArray
 
 #.. PX4 libararies - sub.
 from px4_msgs.msg import EstimatorStates
 from px4_msgs.msg import HoverThrustEstimate 
+from px4_msgs.msg import VehicleAcceleration 
+from px4_msgs.msg import ActuatorOutputs 
 #.. PX4 libararies - pub.
 from px4_msgs.msg import VehicleCommand
 from px4_msgs.msg import OffboardControlMode
 from px4_msgs.msg import TrajectorySetpoint
-from px4_msgs.msg import VehicleAttitudeSetpoint
 
 #.. PF algorithms libararies
 # from .testpy1 import testpypy1
-from .quadrotor_6dof import Quadrotor_6DOF
-from .virtual_target import Virtual_Target
-from .set_parameter import Simulation_Parameter, MPPI_Guidance_Parameter, Way_Point
-from .MPPI_guidance import MPPI_Guidance_Modules
-from .Funcs_PF_Base import kinematics, distance_from_Q6_to_path, check_waypoint, virtual_target_position, \
+from .PF_modules.quadrotor_6dof import Quadrotor_6DOF
+from .PF_modules.virtual_target import Virtual_Target
+from .PF_modules.set_parameter import Way_Point
+from .PF_modules.Funcs_PF_Base import kinematics, distance_from_Q6_to_path, check_waypoint, virtual_target_position, \
     guidance_modules, compensate_Aqi_cmd, thrust_cmd, att_cmd, NDO_Aqi
-from .utility_functions import DCM_from_euler_angle
+from .PF_modules.utility_functions import DCM_from_euler_angle
 
 
 
-class TestAttitudeControlNode(Node):
+class NodePosCtrl(Node):
     
     def __init__(self):
-        super().__init__('test_attitude_control_node')
-        
-        # self.OffboardGroup = MutuallyExclusiveCallbackGroup()
-        self.MPPIGroup = MutuallyExclusiveCallbackGroup()
+        super().__init__('node_position_control')
         
         #.. Reference        
         #   [1]: https://docs.px4.io/main/en/msg_docs/vehicle_command.html
         #   [2]: https://mavlink.io/en/messages/common.html#MAV_CMD_COMPONENT_ARM_DISARM
         #   [3]: https://github.com/PX4/px4_ros_com/blob/release/1.13/src/examples/offboard/offboard_control.cpp
         #   [4]: https://docs.px4.io/main/ko/advanced_config/tuning_the_ecl_ekf.html
+        #   [5]: https://hostramus.tistory.com/category/ROS2
         
         #.. mapping of ros2-px4 message name using in this code
         #   from ' [basedir]/ws_sensor_combined/src/px4_ros_com/templates/urtps_bridge_topics.yaml '
@@ -52,22 +50,21 @@ class TestAttitudeControlNode(Node):
             VehicleCommand          =   '/fmu/in/vehicle_command'
             OffboardControlMode     =   '/fmu/in/offboard_control_mode'
             TrajectorySetpoint      =   '/fmu/in/trajectory_setpoint'
-            VehicleAttitudeSetpoint =   '/fmu/in/vehicle_attitude_setpoint'
             EstimatorStates         =   '/fmu/out/estimator_states'
             HoverThrustEstimate     =   '/fmu/out/hover_thrust_estimate'
+            VehicleAcceleration     =   '/fmu/out/vehicle_acceleration'
+            ActuatorOutputs         =   '/fmu/out/actuator_outputs'
                     
         #.. publishers - from ROS2 msgs to px4 msgs
         self.vehicle_command_publisher_             =   self.create_publisher(VehicleCommand, msg_mapping_ros2_to_px4.VehicleCommand, 10)
         self.offboard_control_mode_publisher_       =   self.create_publisher(OffboardControlMode, msg_mapping_ros2_to_px4.OffboardControlMode , 10)
-        self.trajectory_setpoint_publisher_         =   self.create_publisher(TrajectorySetpoint, msg_mapping_ros2_to_px4.TrajectorySetpoint, 10)
-        self.vehicle_attitude_setpoint_publisher_   =   self.create_publisher(VehicleAttitudeSetpoint, msg_mapping_ros2_to_px4.VehicleAttitudeSetpoint, 10)        
+        self.trajectory_setpoint_publisher_         =   self.create_publisher(TrajectorySetpoint, msg_mapping_ros2_to_px4.TrajectorySetpoint, 10)      
         #.. subscriptions - from px4 msgs to ROS2 msgs
         self.estimator_states_subscription          =   self.create_subscription(EstimatorStates, msg_mapping_ros2_to_px4.EstimatorStates, self.subscript_estimator_states, qos_profile_sensor_data)
         self.hover_thrust_estimate_subscription     =   self.create_subscription(HoverThrustEstimate, msg_mapping_ros2_to_px4.HoverThrustEstimate, self.subscript_hover_thrust_estimate, qos_profile_sensor_data)
-
-        #.. publishers - from ROS2 msgs to ROS2 msgs
-        self.MPPI_output_publisher_     =   self.create_publisher(Float64MultiArray, 'topic_name_MPPI_output', qos_profile_sensor_data)
-
+        self.vehicle_acceleration_subscription      =   self.create_subscription(VehicleAcceleration, msg_mapping_ros2_to_px4.VehicleAcceleration, self.subscript_vehicle_acceleration, qos_profile_sensor_data)
+        self.actuator_outputs_subscription          =   self.create_subscription(ActuatorOutputs, msg_mapping_ros2_to_px4.ActuatorOutputs, self.subscript_actuator_outputs, qos_profile_sensor_data)
+        
         #.. parameter - vehicle command 
         class prm_msg_veh_com:
             def __init__(self):
@@ -100,108 +97,67 @@ class TestAttitudeControlNode(Node):
                 self.body_rate       =   False
                 
         self.prm_off_con_mod            =   prm_msg_off_con_mod()
-        # self.prm_off_con_mod.position   =   True
-        self.prm_off_con_mod.attitude   =   True
-        # True
+        self.prm_off_con_mod.position   =   True
         
-        #.. variable - trajectory setpoint 
-        class msg_trj_set:
+        #.. variable - vehicle position setpoint
+        class msg_veh_trj_set:
             def __init__(self):
-                self.pos_NED    =   np.NaN * np.ones(3)
-                self.yaw_rad    =   np.NaN
-                # self.vel_NED    =   np.NaN * np.ones(3)
-                # self.yawspeed_rad   =   np.NaN
-                # self.acc_NED    =   np.NaN * np.ones(3)
-                # self.jerk_NED   =   np.NaN * np.ones(3)
-                # self.thrust_NED =   np.NaN * np.ones(3)
-                
-        self.trj_set    =   msg_trj_set()
+                self.pos_NED    =   np.zeros(3)
+                self.yaw_rad    =   0.
         
-        
-        #.. variable - vehicle attitude setpoint
-        class msg_veh_att_set:
-            def __init__(self):
-                self.roll_body  =   np.NaN      # body angle in NED frame (can be NaN for FW)
-                self.pitch_body =   np.NaN      # body angle in NED frame (can be NaN for FW)
-                self.yaw_body   =   np.NaN      # body angle in NED frame (can be NaN for FW)
-                self.q_d        =   [np.NaN, np.NaN, np.NaN, np.NaN]
-                self.yaw_sp_move_rate   =   np.NaN      # rad/s (commanded by user)
-                
-                # For clarification: For multicopters thrust_body[0] and thrust[1] are usually 0 and thrust[2] is the negative throttle demand.
-                # For fixed wings thrust_x is the throttle demand and thrust_y, thrust_z will usually be zero.
-                self.thrust_body    =   np.NaN * np.ones(3) # Normalized thrust command in body NED frame [-1,1]
-                
-        self.veh_att_set    =   msg_veh_att_set()
-                
+        self.veh_trj_set    =   msg_veh_trj_set()
         
         #.. other parameter & variable
-        # timestamp
-        self.timestamp  =   0
+        #.. takeoff_time
+        self.takeoff_start = False
+        self.takeoff_time = 0
         
         # vehicle state variable
         self.pos_NED    =   np.zeros(3)
         self.vel_NED    =   np.zeros(3)
-        self.eul_ang_deg    =   np.zeros(3)
+        self.eul_ang_rad    =   np.zeros(3)
         self.windvel_NE     =   np.zeros(2)
                 
-        # callback test_attitude_control
-        period_offboard_att_ctrl    =   0.004
-        # self.timer  =   self.create_timer(period_offboard_att_ctrl, self.test_attitude_control)
-        # self.timer  =   self.create_timer(period_offboard_att_ctrl, self.test_attitude_control, callback_group = self.OffboardGroup)
+        # callback main_position_control
+        period_offboard_pos_ctrl    =   0.02
+        self.timer  =   self.create_timer(period_offboard_pos_ctrl, self.main_position_control)
         
         # callback offboard_control_mode
         # offboard counter in [3]
         period_offboard_control_mode    =   0.2
-        # self.timer  =   self.create_timer(period_offboard_control_mode, self.offboard_control_mode)
-        # self.timer  =   self.create_timer(period_offboard_control_mode, self.offboard_control_mode, callback_group = self.OffboardGroup)
-        self.prm_offboard_setpoint_counter_start_flight  =   m.ceil(2/period_offboard_control_mode)
+        self.timer  =   self.create_timer(period_offboard_control_mode, self.offboard_control_mode)
+        self.prm_offboard_setpoint_counter_start_flight  =   m.ceil(2./period_offboard_control_mode)
         self.offboard_setpoint_counter_     =   0
-        
-        # callback test_attitude_control
-        period_MPPI_param       =   0.05
-        self.timer  =   self.create_timer(period_MPPI_param, self.PF_MPPI_param, callback_group = self.MPPIGroup)
         
         ###### - start - Vars. for PF algorithm ######
         #.. declare variables/instances
         self.Q6     =   Quadrotor_6DOF()
-        self.Q6.dt_GCU  =   period_offboard_att_ctrl
-        self.Guid_type  =   3           # | 0: PD control | 1: guidance law | 2: MPPI direct accel cmd | 3: MPPI guidance-based |
+        self.Q6.dt_GCU  =   period_offboard_pos_ctrl
+        # self.Q6.Guid_type  =   1           # | 0: PD control | 1: guidance law | 2: MPPI direct accel cmd | 3: MPPI guidance-based |
         
         self.VT     =   Virtual_Target()
+        self.VT_psi_cmd     =   Virtual_Target()
         
         #.. set waypoint
-        wp_type_selection   =   1       # | 0: straight line | 1: ractangle | 2: circle | 3: designed
+        wp_type_selection   =   0       # | 0: straight line | 1: ractangle | 2: circle | 3: designed
         self.WP     =   Way_Point(wp_type_selection)
 
-        #.. MPPI setting
-        # parameter
-        type_MPPI   =   self.Q6.Guid_type   # 0~1: no use MPPI | 2: direct accel cmd | 3: guidance-based |
-        self.MP     =   MPPI_Guidance_Parameter(type_MPPI)
-        self.MP.dt  =   period_MPPI_param
-        if type_MPPI == 2:
-            self.Q6.desired_speed = 2.
-            self.Q6.look_ahead_distance = 4.
-            self.Q6.guid_eta = 3.
-            self.MP.u1_init = 0.
-            self.MP.u2_init = 0.
-            self.MP.u3_init = 0.
-        elif type_MPPI == 3:
-            self.Q6.desired_speed = 1.
-            self.Q6.look_ahead_distance = 1.
-            self.Q6.guid_eta = 3.
-            self.MP.u1_init = self.Q6.look_ahead_distance
-            self.MP.u2_init = self.Q6.desired_speed
-            self.MP.u3_init = self.Q6.guid_eta
-        # module
-        self.MG      =   MPPI_Guidance_Modules(self.MP)
-        # initialization
-        self.MG.set_total_MPPI_code(self.WP.WPs.shape[0])
-        self.MG.set_MPPI_entropy_calc_code()
-        
-        self.MPPI_ctrl_input = np.array([self.MP.u1_init, self.MP.u2_init, self.MP.u3_init])
-                
         #.. hover_thrust
-        self.hover_thrust = 0.75
+        self.Aqi_grav   =   np.array([0., 0., 9.81])
+        self.hover_thrust = 0.7         # iris
+        # self.hover_thrust = 0.5
+        # self.hover_thrust = 0.41        # typhoon
+        
+        #.. callback state_logger
+        Hz_state_logger = 10
+        self.timer  =   self.create_timer(1/Hz_state_logger, self.state_logger)
+        self.datalogFile = open("/root/point_mass_6d/datalogfile/datalog.txt",'w')
+        
+        self.att_ang_cmd = np.zeros(3)
+        self.Aqi_cmd = np.zeros(3)
+        
+        self.accel_xyz = np.zeros(3)
+        self.actuator_outputs = np.zeros(16)
         ###### -  end  - Vars. for PF algorithm ######
         
         
@@ -224,28 +180,32 @@ class TestAttitudeControlNode(Node):
             #.. variable setting
             self.Q6.Ri  =   self.pos_NED
             self.Q6.Vi  =   self.vel_NED
-            self.Q6.att_ang =   self.eul_ang_deg * m.pi / 180.
+            self.Q6.att_ang =   self.eul_ang_rad
             self.Q6.cI_B    =   DCM_from_euler_angle(self.Q6.att_ang)
+            # self.Q6.throttle_hover = self.hover_thrust
             #.. initialization
             self.WP.init_WP(self.Q6.Ri)
             self.VT.init_VT_Ri(self.WP.WPs, self.Q6.Ri, self.Q6.look_ahead_distance)
             
+            self.VT_psi_cmd.init_VT_Ri(self.WP.WPs, self.Q6.Ri, self.Q6.look_ahead_distance_psi_cmd)
         pass
     
     
-    #.. test_attitude_control 
-    def test_attitude_control(self):
+    #.. main_position_control 
+    def main_position_control(self):
         
         #.. variable setting
-        self.Q6.Ri  =   self.pos_NED
-        self.Q6.Vi  =   self.vel_NED
-        self.Q6.att_ang =   self.eul_ang_deg * m.pi / 180.
+        self.Q6.Ri  =   self.pos_NED.copy()
+        self.Q6.Vi  =   self.vel_NED.copy()
+        self.Q6.att_ang =   self.eul_ang_rad
         self.Q6.cI_B    =   DCM_from_euler_angle(self.Q6.att_ang)
         self.Q6.throttle_hover = self.hover_thrust
+        self.Q6.Ai      =   np.matmul(np.transpose(self.Q6.cI_B), self.accel_xyz)
         
         ###### - start - PF algorithm ######
         #.. kinematics
         mag_Vqi, LOS_azim, LOS_elev, tgo, FPA_azim, FPA_elev, self.Q6.cI_W = kinematics(self.VT.Ri, self.Q6.Ri, self.Q6.Vi)
+        # mag_Vqi, LOS_azim, LOS_elev, tgo, FPA_azim, FPA_elev, self.Q6.cI_W = kinematics(self.VT_psi_cmd.Ri, self.Q6.Ri, self.Q6.Vi)
         LA_azim     =   FPA_azim - LOS_azim
         LA_elev     =   FPA_elev - LOS_elev
         
@@ -261,47 +221,63 @@ class TestAttitudeControlNode(Node):
         # virtual target position
         self.VT.Ri = virtual_target_position(dist_to_path, self.Q6.look_ahead_distance, self.Q6.p_closest_on_path, self.Q6.WP_idx_passed, self.WP.WPs)
         
-        #.. guidance modules
-        self.Q6.Ai = (self.Q6.Vi - self.Q6.Vi_prev) / self.Q6.dt_GCU
-        self.Q6.Vi_prev = self.Q6.Vi
-        Aqi_cmd, self.Q6.flag_guid_trans = guidance_modules(self.Q6.Guid_type, mag_Vqi, self.Q6.WP_idx_passed, self.Q6.flag_guid_trans, self.Q6.WP_idx_heading, self.WP.WPs.shape[0],
-                    self.VT.Ri, self.Q6.Ri, self.Q6.Vi, self.Q6.Ai, self.Q6.desired_speed, self.Q6.Kp_vel, self.Q6.Kd_vel, self.Q6.Kp_speed, self.Q6.Kd_speed, self.Q6.guid_eta, self.Q6.cI_W, tgo, self.MPPI_ctrl_input)                
-            
-            
-        #.. compensate Aqi_cmd
-        self.Q6.Ai_est_dstb  =   self.Q6.out_NDO.copy()
-        Aqi_grav    =   np.array([0., 0., 9.81])
-        Aqi_cmd = compensate_Aqi_cmd(Aqi_cmd, self.Q6.Ai_est_dstb, Aqi_grav)
-        
-        #.. thrust command
-        MP_a_lim = 1.0
-        self.Q6.mag_Aqi_thru, mag_thrust_cmd, norm_thrust_cmd = thrust_cmd(Aqi_cmd, self.Q6.throttle_hover, MP_a_lim, self.Q6.mass)
-        
-        # .. att_cmd
-        att_ang_cmd = att_cmd(Aqi_cmd, self.Q6.att_ang[2], LOS_azim)
-        
-        #.. NDO_Aqi
-        self.Q6.thr_unitvec, self.Q6.out_NDO, self.Q6.z_NDO = NDO_Aqi(
-            Aqi_grav, self.Q6.mag_Aqi_thru, self.Q6.cI_B, self.Q6.thr_unitvec, self.Q6.gain_NDO, self.Q6.z_NDO, self.Q6.Vi, self.Q6.dt_GCU)
-        
+        self.VT_psi_cmd.Ri = virtual_target_position(dist_to_path, self.Q6.look_ahead_distance_psi_cmd, self.Q6.p_closest_on_path, self.Q6.WP_idx_passed, self.WP.WPs)
         ###### -  end  - PF algorithm ######
         
-        w, x, y, z = self.Euler2Quaternion(att_ang_cmd[0], att_ang_cmd[1], att_ang_cmd[2])
-        self.veh_att_set.thrust_body    =   [0., 0., -norm_thrust_cmd]
         
-        self.veh_att_set.q_d            =   [w, x, y, z]
-        self.publisher_vehicle_attitude_setpoint(self.veh_att_set)
+        self.veh_trj_set.pos_NED    =   self.VT.Ri.copy()
+        self.veh_trj_set.yaw_rad    =   LOS_azim
+        self.publish_trajectory_setpoint(self.veh_trj_set)
         
         pass
     
-    #.. PF_MPPI_param 
-    def PF_MPPI_param(self):
-        #.. MPPI algorithm
-        MPPI_ctrl_input1, MPPI_ctrl_input2    =   self.MG.run_MPPI_Guidance(self.Q6, self.WP.WPs, self.VT)
-        self.MPPI_ctrl_input    =   MPPI_ctrl_input1.copy()
-        print("MPPI: [0]=" + str(self.MPPI_ctrl_input[0]) + ", [1]=" + str(self.MPPI_ctrl_input[1]) + ", [2]=" + str(self.MPPI_ctrl_input[2]))
+    #.. state_logger 
+    def state_logger(self):
+        if (self.Q6.WP_idx_heading < self.WP.WPs.shape[0]-1):
+        # if (self.Q6.WP_idx_heading < self.WP.WPs.shape[0]):
+            # self.get_logger().info("-----------------")
+            current_time = int(Clock().now().nanoseconds / 1000) # time in microseconds
+            sim_time   =   (current_time - self.takeoff_time) / 1000000
+            
+            self.get_logger().info("-----------------")
+            self.get_logger().info("sim_time =" + str(sim_time) )
+            self.get_logger().info("flag_guid_trans =" + str(self.Q6.flag_guid_trans) )
+            self.get_logger().info("throttle_hover      =" + str(self.Q6.throttle_hover) )
+            self.get_logger().info("Vi:         [0]=" + str(self.Q6.Vi[0]) +", [1]=" + str(self.Q6.Vi[1]) +", [2]=" + str(self.Q6.Vi[2]))
+            self.get_logger().info("out_NDO:    [0]=" + str(self.Q6.out_NDO[0]) +", [1]=" + str(self.Q6.out_NDO[1]) +", [2]=" + str(self.Q6.out_NDO[2]))
+            self.get_logger().info("att_cmd_deg:[0]=" + str(self.att_ang_cmd[0]*180./m.pi) +", [1]=" + str(self.att_ang_cmd[1]*180./m.pi) +", [2]=" + str(self.att_ang_cmd[2]*180./m.pi))
+            self.get_logger().info("att_ang    :[0]=" + str(self.Q6.att_ang[0]*180./m.pi) +", [1]=" + str(self.Q6.att_ang[1]*180./m.pi) +", [2]=" + str(self.Q6.att_ang[2]*180./m.pi))
+            self.get_logger().info("Aqi_cmd    :[0]=" + str(self.Aqi_cmd[0]) +", [1]=" + str(self.Aqi_cmd[1]) +", [2]=" + str(self.Aqi_cmd[2]))
+            self.get_logger().info("Ai         :[0]=" + str(self.Q6.Ai[0]) + "[1]=" + str(self.Q6.Ai[1]) + "[2]=" + str(self.Q6.Ai[2]) )
+            self.get_logger().info("Act_Out    :[0]=" + str(round(self.actuator_outputs[0], 2))+ ", [1]=" + str(round(self.actuator_outputs[1], 2))+ ", [2]=" + str(round(self.actuator_outputs[2], 2))+ ", [3]=" + str(round(self.actuator_outputs[3], 2))
+                                           + ", [4]=" + str(round(self.actuator_outputs[4], 2))+ ", [5]=" + str(round(self.actuator_outputs[5], 2)) )
+            
+            
+            # if self.takeoff_start == True and sim_time  < 45.:
+            if self.takeoff_start:
+                self.sim_time = sim_time
+                w, x, y, z = self.Euler2Quaternion(self.Q6.att_ang[0], self.Q6.att_ang[1], self.Q6.att_ang[2])
+                
+                Data = "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f \
+                     %f %f %f %f %f %f %f %f %f %f\n" %(
+                    sim_time, self.VT.Ri[0], self.VT.Ri[1], self.VT.Ri[2], self.Q6.Ri[0], 
+                    self.Q6.Ri[1], self.Q6.Ri[2], self.Q6.Vi[0], self.Q6.Vi[1], self.Q6.Vi[2], 
+                    self.Q6.out_NDO[0], self.Q6.out_NDO[1], self.Q6.out_NDO[2], self.Q6.att_ang[0], self.Q6.att_ang[1], 
+                    self.Q6.att_ang[2],  self.att_ang_cmd[0],  self.att_ang_cmd[1], self.att_ang_cmd[2], self.Q6.desired_speed, 
+                    
+                    self.Aqi_cmd[0], self.Aqi_cmd[1], self.Aqi_cmd[2], self.Q6.Ai[0], self.Q6.Ai[1],
+                    self.Q6.Ai[2], 0., 0., 0., 0.,
+                    
+                    w, x, y, z, 0.,
+                    self.actuator_outputs[0], self.actuator_outputs[1], self.actuator_outputs[2], self.actuator_outputs[3], self.actuator_outputs[4], self.actuator_outputs[5], 
+                    0., 0., 0., 0.
+                    )
+                self.datalogFile.write(Data)
+        else:
+            #.. datalogfile close
+            self.datalogFile.close()
+        
         pass
-    
     
                     
     ### publushers
@@ -339,30 +315,9 @@ class TestAttitudeControlNode(Node):
     def publish_trajectory_setpoint(self, trj_set):
         msg                 =   TrajectorySetpoint()
         msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
-        # msg.x               =   trj_set.pos_NED[0]
-        # msg.y               =   trj_set.pos_NED[1]
-        # msg.z               =   trj_set.pos_NED[2]
         msg.position        =   trj_set.pos_NED.tolist()
         msg.yaw             =   trj_set.yaw_rad
         self.trajectory_setpoint_publisher_.publish(msg)
-        
-        pass
-    
-    #.. publisher_vehicle_attitude_setpoint 
-    def publisher_vehicle_attitude_setpoint(self, veh_att_set):
-        msg                 =   VehicleAttitudeSetpoint()
-        msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
-        # msg.roll_body       =   veh_att_set.roll_body
-        # msg.pitch_body      =   veh_att_set.pitch_body
-        # msg.yaw_body        =   veh_att_set.yaw_body
-        msg.q_d[0]          =   veh_att_set.q_d[0]
-        msg.q_d[1]          =   veh_att_set.q_d[1]
-        msg.q_d[2]          =   veh_att_set.q_d[2]
-        msg.q_d[3]          =   veh_att_set.q_d[3]
-        msg.thrust_body[0]  =   0.
-        msg.thrust_body[1]  =   0.
-        msg.thrust_body[2]  =   veh_att_set.thrust_body[2]
-        self.vehicle_attitude_setpoint_publisher_.publish(msg)
         
         pass
         
@@ -376,7 +331,7 @@ class TestAttitudeControlNode(Node):
         self.vel_NED[1]     =   msg.states[5]
         self.vel_NED[2]     =   msg.states[6]
         # Attitude
-        self.eul_ang_deg[0], self.eul_ang_deg[1], self.eul_ang_deg[2] = \
+        self.eul_ang_rad[0], self.eul_ang_rad[1], self.eul_ang_rad[2] = \
             self.Quaternion2Euler(msg.states[0], msg.states[1], msg.states[2], msg.states[3])
         
         # Wind Velocity NE
@@ -384,26 +339,59 @@ class TestAttitudeControlNode(Node):
         self.windvel_NE[1]  =   msg.states[23]
         pass
     
+    #.. subscript_hover_thrust_estimate
     def subscript_hover_thrust_estimate(self, msg):
-        print("------ Debug [6] ------")
-        self.hover_thrust   =   msg.hover_thrust
-        print("----- self.hover_thrust = " + str(self.hover_thrust))
+        self.hover_thrust   =   msg.hover_thrust          # is the value of msg.hover_thrust correct ???
+        if self.takeoff_start == False:
+            self.takeoff_start  =   True
+            self.takeoff_time   =   int(Clock().now().nanoseconds / 1000)
+            self.get_logger().info("takeoff_time = " + str(self.takeoff_time))
+            self.get_logger().info('subscript_hover_thrust_estimate msgs: {0}'.format(msg.hover_thrust))
         pass
     
+    #.. subscript_vehicle_acceleration
+    def subscript_vehicle_acceleration(self, msg):
+        # self.hover_thrust   =   msg.hover_thrust          # is the value of msg.hover_thrust correct ???
+        self.accel_xyz[0] = msg.xyz[0]
+        self.accel_xyz[1] = msg.xyz[1]
+        self.accel_xyz[2] = msg.xyz[2]
+        # self.get_logger().info('subscript_vehicle_acceleration msgs: {0}'.format(msg.xyz))
+        pass
+    
+    #.. subscript_actuator_outputs
+    def subscript_actuator_outputs(self, msg):
+        self.actuator_outputs[0] = msg.output[0]
+        self.actuator_outputs[1] = msg.output[1]
+        self.actuator_outputs[2] = msg.output[2]
+        self.actuator_outputs[3] = msg.output[3]
+        self.actuator_outputs[4] = msg.output[4]
+        self.actuator_outputs[5] = msg.output[5]
+        # self.actuator_outputs[6] = msg.output[6]
+        # self.actuator_outputs[7] = msg.output[7]
+        # self.actuator_outputs[8] = msg.output[8]
+        # self.actuator_outputs[9] = msg.output[9]
+        # self.actuator_outputs[10] = msg.output[10]
+        # self.actuator_outputs[11] = msg.output[11]
+        # self.actuator_outputs[12] = msg.output[12]
+        # self.actuator_outputs[13] = msg.output[13]
+        # self.actuator_outputs[14] = msg.output[14]
+        # self.actuator_outputs[15] = msg.output[15]
+        # self.get_logger().info('subscript_actuator_outputs msgs: {0}'.format(msg.output))
+        pass
             
     ### Mathmatics Functions 
     #.. Quaternion to Euler
     def Quaternion2Euler(self, w, x, y, z):
         t0 = +2.0 * (w * x + y * z)
         t1 = +1.0 - 2.0 * (x * x + y * y)
-        Roll = m.atan2(t0, t1) * 57.2958
+        Roll = m.atan2(t0, t1)
         t2 = +2.0 * (w * y - z * x)
         t2 = +1.0 if t2 > +1.0 else t2
         t2 = -1.0 if t2 < -1.0 else t2
-        Pitch = m.asin(t2) * 57.2958
+        Pitch = m.asin(t2)
         t3 = +2.0 * (w * z + x * y)
         t4 = +1.0 - 2.0 * (y * y + z * z)
-        Yaw = m.atan2(t3, t4) * 57.2958
+        Yaw = m.atan2(t3, t4)
         return Roll, Pitch, Yaw
     
     #.. Euler to Quaternion
@@ -424,12 +412,12 @@ class TestAttitudeControlNode(Node):
         
 def main(args=None):
     print("======================================================")
-    print("------------- main() in test_att_ctrl_dummy_MPPI.py -------------")
+    print("------------- main() in node_pos_ctrl.py -------------")
     print("======================================================")
     rclpy.init(args=args)
-    TestAttitudeControl = TestAttitudeControlNode()
-    rclpy.spin(TestAttitudeControl)
-    TestAttitudeControl.destroy_node()
+    PosCtrl = NodePosCtrl()
+    rclpy.spin(PosCtrl)
+    PosCtrl.destroy_node()
     rclpy.shutdown()
     pass
 if __name__ == '__main__':

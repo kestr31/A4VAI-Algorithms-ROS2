@@ -54,13 +54,14 @@ class MPPI_Guidance_Modules():
                                       self.MP.u1_init, self.MP.u2_init, self.MP.u3_init]).astype(np.float64)
         arr_int_Q6      =   np.array([Q6.WP_idx_heading, Q6.WP_idx_passed, Q6.Guid_type, Q6.flag_guid_trans]).astype(np.int32)
         arr_dbl_Q6      =   np.array([Q6.throttle_hover, tmp_float, Q6.desired_speed, Q6.look_ahead_distance, Q6.distance_change_WP, 
-                                      Q6.Kp_vel, Q6.Kd_vel, Q6.Kp_speed, Q6.Kd_speed, Q6.guid_eta, 
+                                      Q6.Kp_vel, Q6.Kd_vel, Q6.Kp_speed * 0.5, Q6.Kd_speed, Q6.guid_eta, 
                                       Q6.tau_phi, Q6.tau_the, Q6.tau_psi, 
                                       Q6.Ri[0], Q6.Ri[1], Q6.Ri[2], 
                                       Q6.Vi[0], Q6.Vi[1], Q6.Vi[2], 
                                       Q6.Ai[0], Q6.Ai[1], Q6.Ai[2], 
                                       Q6.thr_unitvec[0], Q6.thr_unitvec[1], Q6.thr_unitvec[2]
                                       ]).astype(np.float64)
+        arr_int_WPs     =   np.array([WPs.shape[0]]).astype(np.int32)
         arr_dbl_WPs     =   np.ravel(WPs,order='C').astype(np.float64)
         arr_dbl_VT      =   np.array([VT.Ri[0], VT.Ri[1], VT.Ri[2],
                                       ]).astype(np.float64)
@@ -81,6 +82,7 @@ class MPPI_Guidance_Modules():
         gpu_dbl_MP      =   cuda.mem_alloc(arr_dbl_MP.nbytes)
         gpu_int_Q6      =   cuda.mem_alloc(arr_int_Q6.nbytes)
         gpu_dbl_Q6      =   cuda.mem_alloc(arr_dbl_Q6.nbytes)
+        gpu_int_WPs     =   cuda.mem_alloc(arr_int_WPs.nbytes)
         gpu_dbl_WPs     =   cuda.mem_alloc(arr_dbl_WPs.nbytes)
         gpu_dbl_VT      =   cuda.mem_alloc(arr_dbl_VT.nbytes)
         gpu_Ai_est_dstb =   cuda.mem_alloc(arr_Ai_est_dstb.nbytes)
@@ -100,6 +102,7 @@ class MPPI_Guidance_Modules():
         cuda.memcpy_htod(gpu_dbl_MP,arr_dbl_MP)
         cuda.memcpy_htod(gpu_int_Q6,arr_int_Q6)
         cuda.memcpy_htod(gpu_dbl_Q6,arr_dbl_Q6)
+        cuda.memcpy_htod(gpu_int_WPs,arr_int_WPs)
         cuda.memcpy_htod(gpu_dbl_WPs,arr_dbl_WPs)
         cuda.memcpy_htod(gpu_dbl_VT,arr_dbl_VT)
         cuda.memcpy_htod(gpu_Ai_est_dstb,arr_Ai_est_dstb)
@@ -115,7 +118,7 @@ class MPPI_Guidance_Modules():
                 gpu_delta_u1, gpu_delta_u2, gpu_delta_u3, gpu_stk, 
                 gpu_res1, gpu_res2, gpu_res3, gpu_res4, 
                 gpu_int_MP, gpu_dbl_MP, gpu_int_Q6, gpu_dbl_Q6, 
-                gpu_dbl_WPs, gpu_dbl_VT,gpu_Ai_est_dstb,
+                gpu_int_WPs, gpu_dbl_WPs, gpu_dbl_VT, gpu_Ai_est_dstb,
                 block=blocksz, grid=gridsz)
 
         #.. variable setting - MPPI Monte Carlo simulation
@@ -253,8 +256,10 @@ class MPPI_Guidance_Modules():
         """
         pass
 
-    def set_total_MPPI_code(self, num_WPs):
-        self.total_MPPI_code = "#define nWP " + str(num_WPs) +  """
+    # def set_total_MPPI_code(self, num_WPs):
+        # self.total_MPPI_code = "#define nWP " + str(num_WPs) +  """
+    def set_total_MPPI_code(self):
+        self.total_MPPI_code = """
         /*.. Declaire Subfunctions ..*/
         // utility functions    
         __device__ double norm_(double x[3]);
@@ -271,7 +276,7 @@ class MPPI_Guidance_Modules():
             double* arr_delta_u1, double* arr_delta_u2, double* arr_delta_u3, double* arr_stk, \
             double* arr_res1, double* arr_res2, double* arr_res3, double* arr_res4, \
             int* arr_int_MP, double* arr_dbl_MP, int* arr_int_Q6, double* arr_dbl_Q6, \
-            double* arr_dbl_WPs, double* arr_dbl_VT, double* arr_Ai_est_dstb)
+            int* arr_int_WPs, double* arr_dbl_WPs, double* arr_dbl_VT, double* arr_Ai_est_dstb)
         {
             //.. GPU core index for parallel computation
             int idx     =   threadIdx.x + threadIdx.y*blockDim.x + blockIdx.x*blockDim.x*blockDim.y + blockIdx.y*blockDim.x*blockDim.y*gridDim.x;
@@ -333,7 +338,8 @@ class MPPI_Guidance_Modules():
             double VT_Ri[3]     =   {arr_dbl_VT[0], arr_dbl_VT[1], arr_dbl_VT[2]};
             
             // set waypoint
-            double WP_WPs[nWP][3]   =   {0.,};
+            int nWP = arr_int_WPs[0];
+            double WP_WPs[500][3]   =   {0.,};
             for(int i_WP = 0; i_WP < nWP; i_WP++){
                 for(int i_3 = 0; i_3 < 3; i_3++){
                     WP_WPs[i_WP][i_3] = arr_dbl_WPs[i_WP*3 + i_3];

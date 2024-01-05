@@ -22,7 +22,10 @@ setup(
         'console_scripts': [
             "node_att_ctrl = offboard_ctrl.node_att_ctrl:main",
             "node_MPPI_output = offboard_ctrl.node_MPPI_output:main",
-            "node_GPR_output = offboard_ctrl.node_MPPI_output:main"
+            "node_GPR_output = offboard_ctrl.node_MPPI_output:main",
+            "node_pos_ctrl = offboard_ctrl.node_pos_ctrl:main",
+            "node_accel_ctrl = offboard_ctrl.node_accel_ctrl:main",
+            "node_att_ctrl_w_accel = offboard_ctrl.node_att_ctrl_w_accel:main"
         ],
     },
 )
