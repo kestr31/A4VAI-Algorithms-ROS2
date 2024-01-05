@@ -13,109 +13,34 @@ import math as m
 
 # private libs.
 
-# simulation parameter setting
-class Simulation_Parameter():
-    #.. initialize an instance of the class
-    def __init__(self) -> None:
-        self.t           =   0.
-        self.dt          =   0.001
-        # self.tf          =   45. + self.dt
-        self.tf          =   65. + self.dt
-        # self.tf          =   300. + self.dt
-        # self.tf          =   113.9 + self.dt
-        self.i_run       =   1
-        self.cycle_save  =   1 #20
-        pass
-    pass
-
-# designed wind setting
-class Wind_Designed():
-    #.. initialize an instance of the class
-    def __init__(self) -> None:
-        self.set_windtype()
-        pass
-
-    #.. set the details of each wind
-    def set_windtype(self, TypeFlag=0):
-        #.. Type - / 0: no wind / 1 : designed wind #1, / 2 : designed wind #2, varying const. wind / 3 : random case #1 
-        self.TypeFlag   =   TypeFlag
-        mag_max_CW      =   6.
-        mag_max_GU      =   6.
-        if TypeFlag == 1 :
-            # constant wind
-            self.arr_CW_time    =   10.*np.arange(20) - 10.
-            self.arr_CW_mag     =   mag_max_CW*np.ones(20)
-            arr_temp            =   np.array([60., 60., 60., 60.]) / 57.3
-            self.arr_CW_azim    =   np.concatenate((arr_temp,arr_temp,arr_temp,arr_temp,arr_temp))
-            arr_temp            =   np.array([0., 0., 0., 0.]) / 57.3
-            self.arr_CW_elev    =   np.concatenate((arr_temp,arr_temp,arr_temp,arr_temp,arr_temp))
-            self.arr_CW_tras_time    =   2.*np.ones(20)
-            # gust
-            self.arr_GU_time    =   10.*np.arange(20) - 5.
-            self.arr_GU_mag     =   mag_max_GU*np.ones(20)
-            arr_temp            =   np.array([0., -90., 180., 90.]) / 57.3
-            self.arr_GU_azim    =   np.concatenate((arr_temp,arr_temp,arr_temp,arr_temp,arr_temp))
-            arr_temp            =   np.array([0., 5., 0., -5.]) / 57.3
-            self.arr_GU_elev    =   np.concatenate((arr_temp,arr_temp,arr_temp,arr_temp,arr_temp))
-            self.arr_GU_dur_time    =   3.*np.ones(20)
-            # turbulence
-            self.TU_duration_time   =   1.
-        elif TypeFlag == 2 :
-            # constant wind
-            self.arr_CW_time    =   10.*np.arange(20) + 10.
-            self.arr_CW_mag     =   mag_max_CW*np.ones(20)
-            arr_temp            =   np.array([90., 0., -90., 180.]) / 57.3
-            self.arr_CW_azim    =   np.concatenate((arr_temp,arr_temp,arr_temp,arr_temp,arr_temp))
-            arr_temp            =   np.array([0., -5., 0., 5.]) / 57.3
-            self.arr_CW_elev    =   np.concatenate((arr_temp,arr_temp,arr_temp,arr_temp,arr_temp))
-            self.arr_CW_tras_time    =   np.ones(20)
-            # gust
-            self.arr_GU_time    =   10.*np.arange(20) - 5.
-            self.arr_GU_mag     =   mag_max_GU*np.ones(20)
-            arr_temp            =   np.array([0., -90., 180., 90.]) / 57.3
-            self.arr_GU_azim    =   np.concatenate((arr_temp,arr_temp,arr_temp,arr_temp,arr_temp))
-            arr_temp            =   np.array([0., 5., 0., -5.]) / 57.3
-            self.arr_GU_elev    =   np.concatenate((arr_temp,arr_temp,arr_temp,arr_temp,arr_temp))
-            self.arr_GU_dur_time    =   3.*np.ones(20)
-            # turbulence
-            self.TU_duration_time   =   1.
-        else :
-            # constant wind
-            self.arr_CW_time    =   np.array([99999.])
-            self.arr_CW_mag     =   np.zeros(1)
-            self.arr_CW_azim    =   np.zeros(1)
-            self.arr_CW_elev    =   np.zeros(1)
-            self.arr_CW_tras_time    =   np.ones(1)
-            # gust
-            self.arr_GU_time    =   np.array([99999.])
-            self.arr_GU_mag     =   np.zeros(1)
-            self.arr_GU_azim    =   np.zeros(1)
-            self.arr_GU_elev    =   np.zeros(1)
-            self.arr_GU_dur_time    =   np.ones(1)
-            # turbulence
-            self.TU_duration_time   =   1.
-            pass
-        pass
-    
-    
-
 # waypoint setting
 class Way_Point():
     #.. initialize an instance of the class
     def __init__(self,wp_type_selection) -> None:
         #.. straight line
         if wp_type_selection == 0:
-            d       =   25.
-            self.WPs     =   np.array([ [0, 0, -10], [d, d, -10] ])
+            d       =   150.
+            h1      =   10.
+            wp0     =   5.
+            self.WPs     =   np.array([ [0, 0, -h1], [wp0, 0., -h1], [d-wp0, 0., -h1], [d, 0., -h1] ])
         #.. rectangle
         elif wp_type_selection == 1:
-            d       =   25.     # 25.
+            # d       =   25.     # 25.
+            d       =   35.     # 25.
+            # d       =   45.     # 25.
             wp0     =   5.
             h1      =   10.
             h2      =   10.
+            
+            # self.WPs     =   np.array([ [0, 0, -h1],
+            #                     [wp0, wp0, -h1], [wp0 + 10, wp0, -h1], [wp0 + d, wp0, -h2], [wp0 + d, wp0 + d, -h1], [wp0, wp0 + d, -h2], [wp0, wp0, -h1], 
+            #                     [0, 0, -h1]])
+            
             self.WPs     =   np.array([ [0, 0, -h1],
                                 [wp0, wp0, -h1], [wp0 + d, wp0, -h2], [wp0 + d, wp0 + d, -h1], [wp0, wp0 + d, -h2], [wp0, wp0, -h1], 
                                 [0, 0, -h1]])
+            
+            
         #.. circle
         elif wp_type_selection == 2:
             # param.
@@ -167,9 +92,13 @@ class MPPI_Guidance_Parameter():
         self.Q_lim_margin = np.array([0.9])
         self.Q_lim  =   np.array([0.5])
         self.a_lim  =   1.0
-        self.Q      =   np.array([0.2, 0.02, 10.0, 0.0])
+        # self.Q      =   np.array([0.2, 0.02, 10.0, 0.0])
+        # self.Q      =   np.array([0.05, 0.02, 0.2, 0.0])
+        # self.Q      =   np.array([0.05, 0.02, 0.5, 0.0])
+        self.Q      =   np.array([0.05, 0.02, 2.0, 0.0])
         self.R      =   np.array([0.001, 0.001, 0.001])
-        self.K      =   2**8        # 7 vs. 11
+        self.K      =   2**8
+        # self.K      =   2**9
         
         if MPPI_type_selection == 2:
             #.. cost
@@ -198,16 +127,18 @@ class MPPI_Guidance_Parameter():
             self.dt     =   0.04
             self.N      =   100
             self.nu     =   1000.
-            #.. u1: LAD, u2: desired_speed, u3: eta
-            self.var1   =   1.0 * 1.0           # 0.2
+            # #.. u1: LAD, u2: desired_speed, u3: eta
+            # self.var1   =   1.0 * 0.7           # 0.2
+            self.var1   =   1.0 * 0.5           # 0.2
+            
             self.var2   =   self.var1
             self.var3   =   self.var1
             self.lamb1  =   1.0 *1.0           # 1.0
             self.lamb2  =   self.lamb1
             self.lamb3  =   self.lamb1
-            self.u1_init    =   1.
-            self.u2_init    =   1.
-            self.u3_init    =   3.
+            self.u1_init    =   3.0
+            self.u2_init    =   2.0
+            self.u3_init    =   2.
             
         
         #.. no use MPPI module

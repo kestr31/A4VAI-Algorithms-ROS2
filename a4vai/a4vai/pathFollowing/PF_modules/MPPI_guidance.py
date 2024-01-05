@@ -19,7 +19,6 @@ from .quadrotor_6dof import Quadrotor_6DOF
 from .virtual_target import Virtual_Target
 from .set_parameter import MPPI_Guidance_Parameter
 
-
 # A Q6rotor 3dof model integrated in a class which cosnsists of several modules 
 class MPPI_Guidance_Modules():    
     #.. initialize an instance of the class
@@ -34,6 +33,7 @@ class MPPI_Guidance_Modules():
 
     def run_MPPI_Guidance(self, Q6:Quadrotor_6DOF, WPs:np, VT:Virtual_Target):
         #.. variable setting - MPPI Monte Carlo simulation
+        tmp_float = 0.
         # set CPU variables
         arr_u1          =   np.array(self.u1).astype(np.float64)
         arr_u2          =   np.array(self.u2).astype(np.float64)
@@ -41,13 +41,9 @@ class MPPI_Guidance_Modules():
         arr_delta_u1    =   self.MP.var1*np.random.randn(self.MP.N,self.MP.K).astype(np.float64)
         arr_delta_u2    =   self.MP.var2*np.random.randn(self.MP.N,self.MP.K).astype(np.float64)
         arr_delta_u3    =   self.MP.var3*np.random.randn(self.MP.N,self.MP.K).astype(np.float64)
-        # if Q6.Guid_type == 3:
-        #     # arr_delta_u1    =   np.where(arr_delta_u1 <= 0., 0., arr_delta_u1)
-        #     arr_delta_u2    =   np.where(arr_delta_u2 <= 0., 0., arr_delta_u2)
-        #     pass
         arr_stk         =   np.zeros(self.MP.K).astype(np.float64)
         res_length      =   1 # self.MP.N
-        arr_res1        =   np.zeros(3).astype(np.float64)
+        arr_res1        =   np.zeros(res_length).astype(np.float64)
         arr_res2        =   np.zeros(res_length).astype(np.float64)
         arr_res3        =   np.zeros(res_length).astype(np.float64)
         arr_res4        =   np.zeros(res_length).astype(np.float64)
@@ -57,15 +53,15 @@ class MPPI_Guidance_Modules():
                                       self.MP.Q[0], self.MP.Q[1], self.MP.Q[2], self.MP.Q[3], self.MP.Q_lim[0] * self.MP.Q_lim_margin[0], self.MP.a_lim,
                                       self.MP.u1_init, self.MP.u2_init, self.MP.u3_init]).astype(np.float64)
         arr_int_Q6      =   np.array([Q6.WP_idx_heading, Q6.WP_idx_passed, Q6.Guid_type, Q6.flag_guid_trans]).astype(np.int32)
-        # Q6.CdA = 0.
-        arr_dbl_Q6      =   np.array([Q6.throttle_hover, Q6.CdA, Q6.desired_speed, Q6.look_ahead_distance, Q6.distance_change_WP, 
-                                      Q6.Kp_vel, Q6.Kd_vel, Q6.Kp_speed, Q6.Kd_speed, Q6.guid_eta, 
+        arr_dbl_Q6      =   np.array([Q6.throttle_hover, tmp_float, Q6.desired_speed, Q6.look_ahead_distance, Q6.distance_change_WP, 
+                                      Q6.Kp_vel, Q6.Kd_vel, Q6.Kp_speed * 0.5, Q6.Kd_speed, Q6.guid_eta, 
                                       Q6.tau_phi, Q6.tau_the, Q6.tau_psi, 
                                       Q6.Ri[0], Q6.Ri[1], Q6.Ri[2], 
                                       Q6.Vi[0], Q6.Vi[1], Q6.Vi[2], 
                                       Q6.Ai[0], Q6.Ai[1], Q6.Ai[2], 
                                       Q6.thr_unitvec[0], Q6.thr_unitvec[1], Q6.thr_unitvec[2]
                                       ]).astype(np.float64)
+        arr_int_WPs     =   np.array([WPs.shape[0]]).astype(np.int32)
         arr_dbl_WPs     =   np.ravel(WPs,order='C').astype(np.float64)
         arr_dbl_VT      =   np.array([VT.Ri[0], VT.Ri[1], VT.Ri[2],
                                       ]).astype(np.float64)
@@ -86,6 +82,7 @@ class MPPI_Guidance_Modules():
         gpu_dbl_MP      =   cuda.mem_alloc(arr_dbl_MP.nbytes)
         gpu_int_Q6      =   cuda.mem_alloc(arr_int_Q6.nbytes)
         gpu_dbl_Q6      =   cuda.mem_alloc(arr_dbl_Q6.nbytes)
+        gpu_int_WPs     =   cuda.mem_alloc(arr_int_WPs.nbytes)
         gpu_dbl_WPs     =   cuda.mem_alloc(arr_dbl_WPs.nbytes)
         gpu_dbl_VT      =   cuda.mem_alloc(arr_dbl_VT.nbytes)
         gpu_Ai_est_dstb =   cuda.mem_alloc(arr_Ai_est_dstb.nbytes)
@@ -105,6 +102,7 @@ class MPPI_Guidance_Modules():
         cuda.memcpy_htod(gpu_dbl_MP,arr_dbl_MP)
         cuda.memcpy_htod(gpu_int_Q6,arr_int_Q6)
         cuda.memcpy_htod(gpu_dbl_Q6,arr_dbl_Q6)
+        cuda.memcpy_htod(gpu_int_WPs,arr_int_WPs)
         cuda.memcpy_htod(gpu_dbl_WPs,arr_dbl_WPs)
         cuda.memcpy_htod(gpu_dbl_VT,arr_dbl_VT)
         cuda.memcpy_htod(gpu_Ai_est_dstb,arr_Ai_est_dstb)
@@ -120,7 +118,7 @@ class MPPI_Guidance_Modules():
                 gpu_delta_u1, gpu_delta_u2, gpu_delta_u3, gpu_stk, 
                 gpu_res1, gpu_res2, gpu_res3, gpu_res4, 
                 gpu_int_MP, gpu_dbl_MP, gpu_int_Q6, gpu_dbl_Q6, 
-                gpu_dbl_WPs, gpu_dbl_VT,gpu_Ai_est_dstb,
+                gpu_int_WPs, gpu_dbl_WPs, gpu_dbl_VT, gpu_Ai_est_dstb,
                 block=blocksz, grid=gridsz)
 
         #.. variable setting - MPPI Monte Carlo simulation
@@ -258,8 +256,10 @@ class MPPI_Guidance_Modules():
         """
         pass
 
-    def set_total_MPPI_code(self, num_WPs):
-        self.total_MPPI_code = "#define nWP " + str(num_WPs) +  """
+    # def set_total_MPPI_code(self, num_WPs):
+        # self.total_MPPI_code = "#define nWP " + str(num_WPs) +  """
+    def set_total_MPPI_code(self):
+        self.total_MPPI_code = """
         /*.. Declaire Subfunctions ..*/
         // utility functions    
         __device__ double norm_(double x[3]);
@@ -276,7 +276,7 @@ class MPPI_Guidance_Modules():
             double* arr_delta_u1, double* arr_delta_u2, double* arr_delta_u3, double* arr_stk, \
             double* arr_res1, double* arr_res2, double* arr_res3, double* arr_res4, \
             int* arr_int_MP, double* arr_dbl_MP, int* arr_int_Q6, double* arr_dbl_Q6, \
-            double* arr_dbl_WPs, double* arr_dbl_VT, double* arr_Ai_est_dstb)
+            int* arr_int_WPs, double* arr_dbl_WPs, double* arr_dbl_VT, double* arr_Ai_est_dstb)
         {
             //.. GPU core index for parallel computation
             int idx     =   threadIdx.x + threadIdx.y*blockDim.x + blockIdx.x*blockDim.x*blockDim.y + blockIdx.y*blockDim.x*blockDim.y*gridDim.x;
@@ -306,7 +306,6 @@ class MPPI_Guidance_Modules():
             //.. quadrotor variables
             // parameters
             double Q6_throttle_hover    =    arr_dbl_Q6[0];
-            double Q6_CdA       =    arr_dbl_Q6[1];
             double Q6_desired_speed     =   arr_dbl_Q6[2];
             double Q6_look_ahead_distance   =   arr_dbl_Q6[3];
             double Q6_distance_change_WP    =   arr_dbl_Q6[4];
@@ -339,7 +338,8 @@ class MPPI_Guidance_Modules():
             double VT_Ri[3]     =   {arr_dbl_VT[0], arr_dbl_VT[1], arr_dbl_VT[2]};
             
             // set waypoint
-            double WP_WPs[nWP][3]   =   {0.,};
+            int nWP = arr_int_WPs[0];
+            double WP_WPs[500][3]   =   {0.,};
             for(int i_WP = 0; i_WP < nWP; i_WP++){
                 for(int i_3 = 0; i_3 < 3; i_3++){
                     WP_WPs[i_WP][i_3] = arr_dbl_WPs[i_WP*3 + i_3];
@@ -365,26 +365,9 @@ class MPPI_Guidance_Modules():
                 
                 //.. Environment
                 double Aqi_aero[3] = {0.,};
-                int type_Aqi_aero = 1;      // 0: baseine drag wo/ disturbance, 1: (constant) disturbance
-                if (type_Aqi_aero == 0){
-                    double rho  =   1.224;      // air density   [kg/m3]
-                    double Vwi[3] = {0.,};
-                    double Vqi_aero[3] = { -Q6_Vi[0]+Vwi[0], -Q6_Vi[1]+Vwi[1], -Q6_Vi[2]+Vwi[2] };
-                    double mag_Vqi_aero = norm_(Vqi_aero);
-                    double mag_Aqi_aero = 0.5 * rho * mag_Vqi_aero * mag_Vqi_aero * Q6_CdA;
-                    double unit_Vqi_aero[3] = {0.,};
-                    for (int i_3 = 0; i_3 < 3; i_3++){
-                        unit_Vqi_aero[i_3] = Vqi_aero[i_3] / max(mag_Vqi_aero, 0.1);
-                        Aqi_aero[i_3] = mag_Aqi_aero * unit_Vqi_aero[i_3];
-                        Q6_Ai_est_dstb[i_3] = Aqi_aero[i_3];
-                        //Q6_Ai_est_dstb[i_3] = 0.;
-                    }
-                }
-                else{
-                    for (int i_3 = 0; i_3 < 3; i_3++){
-                        Q6_Ai_est_dstb[i_3] = arr_Ai_est_dstb[i_3 + 3*i_N];
-                        Aqi_aero[i_3] = Q6_Ai_est_dstb[i_3];
-                    }
+                for (int i_3 = 0; i_3 < 3; i_3++){
+                    Q6_Ai_est_dstb[i_3] = arr_Ai_est_dstb[i_3 + 3*i_N];
+                    Aqi_aero[i_3] = Q6_Ai_est_dstb[i_3];
                 }
                 double Aqi_grav[3]  =   {grav_i[0], grav_i[1], grav_i[2]};
                 
@@ -699,15 +682,21 @@ class MPPI_Guidance_Modules():
                     Q6_thr_unitvec[i_3] = Q6_thr_unitvec[i_3] + dot_thr_unitvec[i_3] * SP_dt;
                 }
                 
+                
+                /*
                 //.. check stop
                 // stop around terminal WP, (due to using transition mode, high cost)
                 if (Q6_WP_idx_heading == (nWP - 1)) {
-                    flag_stop   =   1;
+                    flag_stop       =   1;
                 }
                 
-                
-                if (flag_stop == 1)
+                if (flag_stop == 1){
+                    double stk_weight = (double)N /(double)(i_N+1);
+                    arr_stk[idx]    =   stk_weight * arr_stk[idx];
                     break;
+                }
+                */
+                    
                 
             }   // main loop end
         }

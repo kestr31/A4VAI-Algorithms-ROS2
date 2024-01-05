@@ -2,31 +2,21 @@
 
 ## 1. 개요 및 구조
 
-- 기본 유도 법칙 + MPPI 유도 알고리즘의 구현
-- `test_att_ctrl.py` 가 main문에 해당하는 ROS2 node 부분
-- 나머지 파일들(`.py`)은 필요한 클래스, 함수 등을 포함한 파일들
+- 자세제어 노드 + 유도 MPPI 노드 구현 + GPR 구현 (MPPI 노드에)
+- 두 노드간 통신은 std_msgs 로 구현됨
+- KAIST 환경에서 테스트 했을 때, 기존의 자세제어가 끊기는 현상 사라짐 확인
+- "reference_pakage" 폴더를 두어, KAIST 환경의 패키지 구성 참고할 수 있음
+- 노드 이름, 메시지 이름 등이 수정됨
+- GPR은 연산량이 많이 줄어들어서 MPPI 노드에 통합되어 돌아감 (KAIST환경에서 연산량 문제 없이 돌아감을 확인함)
 
 # 2. 필요 작업
 
-- **MPPI 관련 create_timer 부분의 분리가 필요**
+- GPR 모듈의 하이퍼 파라미터 최적화 필요: 현재 상태는 그냥 돌아가게만 해놨음 GPR값을 직접 사용하지는 않는 상태
+- GPR 하이퍼 파라미터 최적화 후, 이 값을 사용하도록 코드 수정 필요
+- 자세제어 명령을 사용할 경우, 급속한 기동에서 자세각속도 제한 등의 saturation 문제가 발생하는 것 같음 --> 이로인한 성능저하 꽤 큼
+- 뿐만아니라, 상대적으로 큰 자세에서 자세 명령을 완전히 따라가지는 못하는 것 확인 --> 이로인한 성능저하 있음
+- 위 문제들을 해결해야 원활한 외란강건 PF가 될 것으로 보임
 
-- [`test_att_ctrl.py`](test_att_ctrl.py#L144)
-
-```python
-# callback test_attitude_control
-period_MPPI_param = 0.05
-self.timer = self.create_timer(period_MPPI_param, self.PF_MPPI_param, callback_group = self.MPPIGroup)
-```
-
-- **지금과 같이 하나의 노드에서 돌리면, ROS2가 MPPI 명령을 계산할 때 문제가 발생**
-    - ROS2 to PX4의 자세제어 명령이 전달되지 못하고 끊어지는 듯한 현상으로, 제대로 날지 못 함.
-- **통합 시뮬레이션 환경 구성에서 이 부분을 해결해야 함.**
-    - 쓰레드분리나, 노드 분리 등의 작업이 필요할 것으로 보임.
-- 지금 상태에서는 하나의 노드에 모든 기능이 다 구현되어있으므로, 제대로 날지 못함.
-- 위의 MPPI 관련 create_timer 부분을 주석처리하면 잘 날 것으로 보임.
-
-<br/>
-
-- **작업 중인 사항들:**
-    - 나머지 파일들(.py) 부분 내용 정리 필요
-    - GP 관련 모듈 적용 필요
+# 3. ROS2 노드 실행
+- node_att_ctrl      --> 자세제어 명령 생성 기본 모듈
+- node_MPPI_output   --> MPPI + GPR 모듈

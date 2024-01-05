@@ -76,22 +76,24 @@ class Quadrotor_6DOF():
         #.. parameter        
         # guidance
         self.dt_GCU     =   0.004
-        self.Guid_type  =   1       # | 0: PD control | 1: guidance law |
+        # self.Guid_type  =   0       # | 0: PD control | 1: guidance law | 2: MPPI direct accel cmd | 3: MPPI guidance-based |
+        # self.Guid_type  =   1       # | 0: PD control | 1: guidance law | 2: MPPI direct accel cmd | 3: MPPI guidance-based |
+        self.Guid_type  =   3       # | 0: PD control | 1: guidance law | 2: MPPI direct accel cmd | 3: MPPI guidance-based |
         self.flag_guid_trans    =   1
-        self.desired_speed      =   3.
-        # self.desired_speed      =   2.
+        self.desired_speed      =   3.0
         self.look_ahead_distance    =   self.desired_speed * 1.5
         self.distance_change_WP     =   self.look_ahead_distance
-        # self.Kp_vel     =   1.
-        self.Kp_vel     =   3.
-        self.Kd_vel     =   0.1 * self.Kp_vel
-        self.Kp_speed   =   2.  # 1.
-        self.Kd_speed   =   self.Kp_speed * 0.1
-        self.guid_eta   =   3.  # 2.
-        self.gain_NDO   =   2.0 * np.array([1.0,1.0,1.0])
-        # self.gain_NDO   =   5.0 * np.array([1.0,1.0,1.0])
-        # self.gain_NDO   =   8.0 * np.array([1.0,1.0,1.0])
+        self.Kp_vel     =   1.0     # 1.0
+        self.Kd_vel     =   0. * self.Kp_vel
+        self.Kp_speed   =   1.0
+        self.Kd_speed   =   self.Kp_speed * 0.
+        self.guid_eta   =   2. 
         
+        # self.gain_NDO   =   0.8 * np.array([1.0,1.0,1.0])
+        self.gain_NDO   =   1.0 * np.array([1.0,1.0,1.0])
+        # self.gain_NDO   =   1.5 * np.array([1.0,1.0,1.0])
+        
+        self.look_ahead_distance_psi_cmd =   self.look_ahead_distance * 2.
 
         #.. gaussian process regression parameter
         self.ne_GPR     =   500    # forecasting number (ne = 2000, te = 2[sec])
@@ -129,18 +131,11 @@ class Quadrotor_6DOF():
         
 
         #.. attitude control parameter
-        self.tau_phi    =   0.2
-        self.tau_the    =   0.2
-        self.tau_psi    =   1.0
-        # self.tau_psi    =   0.6
-
-        self.tau_p              =   0.1  
-        self.tau_q              =   0.1  
-        self.tau_r              =   0.2
-
-        self.alpha_p            =   0.1  
-        self.alpha_q            =   0.1   
-        self.alpha_r            =   0.1  
+        # self.tau_phi    =   0.4
+        # self.tau_phi    =   0.5
+        self.tau_phi    =   0.6
+        self.tau_the    =   self.tau_phi
+        self.tau_psi    =   self.tau_phi * 2.
         
         pass
     pass
