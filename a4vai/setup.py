@@ -21,7 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             'test_att_ctrl = a4vai.pathFollowing.test_att_ctrl:main',
-            'alg1_2 = a4vai.alg1.script2:main'
+            'alg1_2 = a4vai.alg1.script2:main',
+            'test_wayoint = a4vai.pathFollowing.get_waypoint:main'
         ],
     },
 )
