@@ -109,9 +109,12 @@ def guidance_modules(Q6_Guid_type, mag_Vqi, Q6_WP_idx_passed, Q6_flag_guid_trans
             Q6_flag_guid_trans = 1
             ratio_guid_type[0] =   1.
             ratio_guid_type[Q6_Guid_type] =   1. - ratio_guid_type[0]
+            
         if (Q6_flag_guid_trans == 1):
             ratio_guid_type[0] =   1.
             ratio_guid_type[Q6_Guid_type] =   1. - ratio_guid_type[0]
+            # ratio_guid_type[0] =   0.5
+            # ratio_guid_type[Q6_Guid_type] =   1. - ratio_guid_type[0]
             
     # guidance command
     Aqi_cmd     =   np.zeros(3)
@@ -135,6 +138,7 @@ def guidance_modules(Q6_Guid_type, mag_Vqi, Q6_WP_idx_passed, Q6_flag_guid_trans
         dmag_Vqi    =   np.dot(Q6_Vi, Q6_Ai) / max(mag_Vqi, 0.1)
         derr_mag_V  =   0. - dmag_Vqi
         Aqw_cmd[0]  =   Q6_Kp_speed * err_mag_V + Q6_Kd_speed * derr_mag_V
+        # print("err_mag_V = " + str(err_mag_V))
         # optimal pursuit guidance law
         Rqti        =   VT_Ri - Q6_Ri
         Rqtw        =   np.matmul(Q6_cI_W,Rqti)
@@ -154,7 +158,7 @@ def guidance_modules(Q6_Guid_type, mag_Vqi, Q6_WP_idx_passed, Q6_flag_guid_trans
         dmag_Vqi    =   np.dot(Q6_Vi, Q6_Ai) / max(mag_Vqi, 0.1)
         derr_mag_V  =   0. - dmag_Vqi
         Aqw_cmd[0]  =   Q6_Kp_speed * err_mag_V + Q6_Kd_speed * derr_mag_V
-        # optimal pursuit guidance law
+        # pursuit guidance law
         Rqti        =   VT_Ri - Q6_Ri
         Rqtw        =   np.matmul(Q6_cI_W,Rqti)
         err_azim, err_elev    =   azim_elev_from_vec3(Rqtw)
@@ -201,13 +205,13 @@ def att_cmd(Aqi_cmd, Q6_att_ang_2, LOS_azim):
     return att_ang_cmd
 
 #.. NDO_Aqi
-def NDO_Aqi(Aqi_grav, Q6_mag_Aqi_thru, Q6_cI_B, Q6_thr_unitvec, Q6_gain_NDO, Q6_z_NDO, Q6_Vi, Q6_dt_GCU):
+def NDO_Aqi(Aqi_grav, Q6_mag_Aqi_thru, Q6_cI_B, Q6_thr_unitvec, Q6_gain_NDO, Q6_z_NDO, Q6_Vi, dt_NDO):
     # Aqi_thru_wo_grav for NDO
     Ab_thrust   =   np.array([0., 0., -Q6_mag_Aqi_thru])            # 현재 thrust 크기
     Ai_thrust   =   np.matmul(np.transpose(Q6_cI_B), Ab_thrust)     # 자세 반영
     Aqi_thru_wo_grav    =   Q6_mag_Aqi_thru * Q6_thr_unitvec + Aqi_grav
     Q6_thr_unitvec      =   Ai_thrust / max(norm(Ai_thrust), 0.1)
-    
+        
     # nonlinear disturbance observer
     dz_NDO      =   np.zeros(3)
     dz_NDO[0]   =   -Q6_gain_NDO[0]*Q6_z_NDO[0] - Q6_gain_NDO[0] * (Q6_gain_NDO[0]*Q6_Vi[0] + Aqi_thru_wo_grav[0])
@@ -219,9 +223,64 @@ def NDO_Aqi(Aqi_grav, Q6_mag_Aqi_thru, Q6_cI_B, Q6_thr_unitvec, Q6_gain_NDO, Q6_
     Q6_out_NDO[1]  =   Q6_z_NDO[1] + Q6_gain_NDO[1]*Q6_Vi[1]
     Q6_out_NDO[2]  =   Q6_z_NDO[2] + Q6_gain_NDO[2]*Q6_Vi[2]
 
-    Q6_z_NDO  =   Q6_z_NDO + dz_NDO*Q6_dt_GCU
+    Q6_z_NDO  =   Q6_z_NDO + dz_NDO*dt_NDO
     
     return Q6_thr_unitvec, Q6_out_NDO, Q6_z_NDO
     
     
     
+#.. NDO_Aqi
+def NDO_Aqi_v2(Aqi_cmd, Aqi_grav, Q6_mag_Aqi_thru, Q6_cI_B, Q6_thr_unitvec, Q6_gain_NDO, Q6_z_NDO, Q6_Vi, dt_NDO):
+    
+    #.. 이 부분은 MPPI로 빼는게 맞는 것 같음
+    # Aqi_thru_wo_grav for NDO
+    Ab_thrust   =   np.array([0., 0., -Q6_mag_Aqi_thru])            # 현재 thrust 크기
+    Ai_thrust   =   np.matmul(np.transpose(Q6_cI_B), Ab_thrust)     # 자세 반영
+    Q6_thr_unitvec      =   Ai_thrust / max(norm(Ai_thrust), 0.1)
+    
+    # Aqi_thru_wo_grav    =   Q6_mag_Aqi_thru * Q6_thr_unitvec + Aqi_grav
+    
+    Aqi_thru_wo_grav = Aqi_cmd
+        
+    # nonlinear disturbance observer
+    dz_NDO      =   np.zeros(3)
+    dz_NDO[0]   =   -Q6_gain_NDO[0]*Q6_z_NDO[0] - Q6_gain_NDO[0] * (Q6_gain_NDO[0]*Q6_Vi[0] + Aqi_thru_wo_grav[0])
+    dz_NDO[1]   =   -Q6_gain_NDO[1]*Q6_z_NDO[1] - Q6_gain_NDO[1] * (Q6_gain_NDO[1]*Q6_Vi[1] + Aqi_thru_wo_grav[1])
+    dz_NDO[2]   =   -Q6_gain_NDO[2]*Q6_z_NDO[2] - Q6_gain_NDO[2] * (Q6_gain_NDO[2]*Q6_Vi[2] + Aqi_thru_wo_grav[2])
+    
+    Q6_out_NDO  =   np.zeros(3)
+    Q6_out_NDO[0]  =   Q6_z_NDO[0] + Q6_gain_NDO[0]*Q6_Vi[0]
+    Q6_out_NDO[1]  =   Q6_z_NDO[1] + Q6_gain_NDO[1]*Q6_Vi[1]
+    Q6_out_NDO[2]  =   Q6_z_NDO[2] + Q6_gain_NDO[2]*Q6_Vi[2]
+
+    Q6_z_NDO  =   Q6_z_NDO + dz_NDO*dt_NDO
+    
+    return Q6_thr_unitvec, Q6_out_NDO, Q6_z_NDO
+
+#.. NDO_Aqi
+def NDO_Aqi_v3(Aqi_cmd, Aqi_grav, Q6_mag_Aqi_thru, Q6_cI_B, Q6_thr_unitvec, Q6_gain_NDO, Q6_z_NDO, Q6_Vi, dt_NDO):
+    
+    #.. 이 부분은 MPPI로 빼는게 맞는 것 같음
+    # Aqi_thru_wo_grav for NDO
+    Ab_thrust   =   np.array([0., 0., -Q6_mag_Aqi_thru])            # 현재 thrust 크기
+    Ai_thrust   =   np.matmul(np.transpose(Q6_cI_B), Ab_thrust)     # 자세 반영
+    Q6_thr_unitvec      =   Ai_thrust / max(norm(Ai_thrust), 0.1)
+    
+    # Aqi_thru_wo_grav    =   Q6_mag_Aqi_thru * Q6_thr_unitvec + Aqi_grav
+    
+    Aqi_thru_wo_grav = Aqi_cmd + Aqi_grav
+        
+    # nonlinear disturbance observer
+    dz_NDO      =   np.zeros(3)
+    dz_NDO[0]   =   -Q6_gain_NDO[0]*Q6_z_NDO[0] - Q6_gain_NDO[0] * (Q6_gain_NDO[0]*Q6_Vi[0] + Aqi_thru_wo_grav[0])
+    dz_NDO[1]   =   -Q6_gain_NDO[1]*Q6_z_NDO[1] - Q6_gain_NDO[1] * (Q6_gain_NDO[1]*Q6_Vi[1] + Aqi_thru_wo_grav[1])
+    dz_NDO[2]   =   -Q6_gain_NDO[2]*Q6_z_NDO[2] - Q6_gain_NDO[2] * (Q6_gain_NDO[2]*Q6_Vi[2] + Aqi_thru_wo_grav[2])
+    
+    Q6_out_NDO  =   np.zeros(3)
+    Q6_out_NDO[0]  =   Q6_z_NDO[0] + Q6_gain_NDO[0]*Q6_Vi[0]
+    Q6_out_NDO[1]  =   Q6_z_NDO[1] + Q6_gain_NDO[1]*Q6_Vi[1]
+    Q6_out_NDO[2]  =   Q6_z_NDO[2] + Q6_gain_NDO[2]*Q6_Vi[2]
+
+    Q6_z_NDO  =   Q6_z_NDO + dz_NDO*dt_NDO
+    
+    return Q6_thr_unitvec, Q6_out_NDO, Q6_z_NDO
