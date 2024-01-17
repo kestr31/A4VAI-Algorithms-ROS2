@@ -16,7 +16,7 @@ import math as m
 # waypoint setting
 class Way_Point():
     #.. initialize an instance of the class
-    def __init__(self,wp_type_selection) -> None:
+    def __init__(self,wp_type_selection,wpx=None, wpy=None, wpz=None) -> None:
         #.. straight line
         if wp_type_selection == 0:
             d       =   150.
@@ -57,16 +57,15 @@ class Way_Point():
             pass
         #.. designed
         elif wp_type_selection == 3:
-            WPx     =   np.array([0., 7.5, 9.0,  11.9, 16.0, 42.5, 44.0, 44.6, 42.2, 21.0, \
-                17.9, 15.6, 13.9, 13.5, 16.4, 21.0, 28.9, 44.4, 43.8, 40.4, 26.9, -15.0, -25.0, -20.0, -10.0
-                ])
-            WPy     =   np.array([0., 7.7, 44.0, 46.4, 47.0, 46.7, 43.9, 38.1, 35.2, 34.7, \
-                33.4, 29.9, 23.6, 7.9,  5.0,  3.1,  4.3,  25.5, 30.8, 34.3, 38.2, 35.0,  10.0,   0.0, -5.0
-                ])
+            WPx     =   np.array(wpx)
+            WPy     =   np.array(wpy)
+            h       =   np.array(wpz)
+
             N = len(WPx)
             self.WPs        =   -10.*np.ones((N,3))
             self.WPs[:,1]   =   WPx
             self.WPs[:,0]   =   WPy
+            self.WPs[:,2]   =   -h
             pass
         
         else:

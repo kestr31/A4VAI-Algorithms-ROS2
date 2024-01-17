@@ -30,6 +30,8 @@ from .PF_modules.Funcs_PF_Base import kinematics, distance_from_Q6_to_path, chec
     guidance_modules, compensate_Aqi_cmd, thrust_cmd, att_cmd, NDO_Aqi
 from .PF_modules.utility_functions import DCM_from_euler_angle
 
+from .path_plan_service import PathPlanningService
+
 class NodeAttCtrl(Node):
     
     def __init__(self):
@@ -48,14 +50,14 @@ class NodeAttCtrl(Node):
         #
         #.. mapping of ros2-px4 message name using in this code
         class msg_mapping_ros2_to_px4:
-            VehicleCommand          =   '/fmu/in/vehicle_command'
-            OffboardControlMode     =   '/fmu/in/offboard_control_mode'
-            TrajectorySetpoint      =   '/fmu/in/trajectory_setpoint'
-            VehicleAttitudeSetpoint =   '/fmu/in/vehicle_attitude_setpoint'
-            EstimatorStates         =   '/fmu/out/estimator_states'
-            HoverThrustEstimate     =   '/fmu/out/hover_thrust_estimate'
-            VehicleAcceleration     =   '/fmu/out/vehicle_acceleration'
-            ActuatorOutputs         =   '/fmu/out/actuator_outputs'
+            VehicleCommand          =   '/px4_001/fmu/in/vehicle_command'
+            OffboardControlMode     =   '/px4_001/fmu/in/offboard_control_mode'
+            TrajectorySetpoint      =   '/px4_001/fmu/in/trajectory_setpoint'
+            VehicleAttitudeSetpoint =   '/px4_001/fmu/in/vehicle_attitude_setpoint'
+            EstimatorStates         =   '/px4_001/fmu/out/estimator_states'
+            HoverThrustEstimate     =   '/px4_001/fmu/out/hover_thrust_estimate'
+            VehicleAcceleration     =   '/px4_001/fmu/out/vehicle_acceleration'
+            ActuatorOutputs         =   '/px4_001/fmu/out/actuator_outputs'
                     
         #.. publishers - from ROS2 msgs to px4 msgs
         self.vehicle_command_publisher_             =   self.create_publisher(VehicleCommand, msg_mapping_ros2_to_px4.VehicleCommand, 10)
@@ -165,11 +167,59 @@ class NodeAttCtrl(Node):
         
         self.VT     =   Virtual_Target()
         self.VT_psi_cmd     =   Virtual_Target()
-        
+
+
         #.. set waypoint
-        wp_type_selection   =   1       # | 0: straight line | 1: ractangle | 2: circle | 3: designed
-        # wp_type_selection   =   3       # | 0: straight line | 1: ractangle | 2: circle | 3: designed
-        self.WP     =   Way_Point(wp_type_selection)
+        wp_type_selection   =   3       # | 0: straight line | 1: ractangle | 2: circle | 3: designed
+
+
+        # initialize waypoint parameter
+        self.waypoint_index     =   0
+        self.waypoint_x         =   []
+        self.waypoint_y         =   []
+        self.waypoint_z         =   []
+
+        # path planning position
+        # [x, z, y]
+        self.start_point        =   [1.0, 5.0, 1.0]
+        self.goal_point         =   [950.0, 150.0, 950.0]
+        self.path_planning_complete = False
+
+        # path planning start
+        if wp_type_selection == 3:
+            path_planning_service = PathPlanningService()
+            path_planning_service.request_path_planning(self.start_point, self.goal_point)
+            rclpy.spin_until_future_complete(path_planning_service, path_planning_service.future)
+            if path_planning_service.future.done():
+                try : 
+                    path_planning_service.result = path_planning_service.future.result()
+                except Exception as e:
+                    path_planning_service.get_logger().info(
+                        'Path Planning Service call failed %r' % (e,))
+                else :
+                    path_planning_service.get_logger().info( "Path Planning Complete!! ")
+                    if path_planning_service.result.response_path_planning is True :
+                        self.waypoint_x = path_planning_service.result.waypoint_x
+                        self.waypoint_y = path_planning_service.result.waypoint_y
+                        self.waypoint_z = path_planning_service.result.waypoint_z
+                        self.path_planning_complete = path_planning_service.result.response_path_planning
+                    else :
+                        pass
+                finally : 
+                    path_planning_service.destroy_node()
+            else : 
+                self.get_logger().warn("===== Path Planning Module Can't Response =====")
+
+
+
+
+
+
+
+
+
+
+        self.WP     =   Way_Point(wp_type_selection, self.waypoint_x, self.waypoint_y ,self.waypoint_z)
         
         #.. MPPI setting
         self.MP     =   MPPI_Guidance_Parameter(self.Q6.Guid_type)
@@ -244,8 +294,8 @@ class NodeAttCtrl(Node):
         
         #.. callback state_logger
         self.period_state_logger = 0.1
-        self.timer  =   self.create_timer(self.period_state_logger, self.state_logger)
-        self.datalogFile = open("/root/point_mass_6d/datalogfile/datalog.txt",'w')
+        # self.timer  =   self.create_timer(self.period_state_logger, self.state_logger)
+        # self.datalogFile = open("/root/point_mass_6d/datalogfile/datalog.txt",'w')
         
         self.att_ang_cmd = np.zeros(3)
         self.Aqi_cmd = np.zeros(3)
