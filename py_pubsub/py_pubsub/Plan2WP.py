@@ -15,7 +15,8 @@
 import rclpy
 from rclpy.node import Node
 
-from custom_msgs.srv import WaypointSetpoint
+from custom_msgs.msg import GlobalWaypointSetpoint
+from custom_msgs.msg import LocalWaypointSetpoint
 from rclpy.qos import QoSProfile
 import cv2
 from cv_bridge import CvBridge
@@ -622,11 +623,10 @@ class PathPlanningServer(Node):  # topic 이름과 message 타입은 서로 매�
         
         self.mode = 1
         
-        self.request_flag = False
-        self.response_path_planning = False
+
         # create waypoint list server
-        self.path_planning_service = self.create_service(WaypointSetpoint, '/waypoint_setpoint', self.pathplanning_service_callback)
-        
+        self.global_waypoint_publisher = self.create_subscription(GlobalWaypointSetpoint, '/global_waypoint_setpoint', self.global_waypoint_callback ,10)
+        self.local_waypoint_publisher = self.create_publisher(LocalWaypointSetpoint, '/local_waypoint_setpoint_from_PP', 10)
         print("                                          ")
         print("===== Path Planning Node is Running  =====")
         print("                                          ")
@@ -637,47 +637,56 @@ class PathPlanningServer(Node):  # topic 이름과 message 타입은 서로 매�
         self.Step_Num_custom = self.MapSize + 1000
 
 
+
+
+
+    def local_waypoint_publish(self):
+        msg = LocalWaypointSetpoint()
+        msg.path_planning_complete = True
+        msg.waypoint_x             = self.waypoint_x
+        msg.waypoint_y             = self.waypoint_y
+        msg.waypoint_z             = self.waypoint_z
+        self.local_waypoint_publisher.publish(msg)
+        print("                                          ")
+        print("======       Send response           =====")
+        print("                                          ")
+
     # if requested calculate waypoint and send response
-    def pathplanning_service_callback(self, request, response):
+    def global_waypoint_callback(self, msg):
 
         print("                                          ")
         print("===== Recieved Path Planning Request =====")
         print("                                          ")
 
-        self.request_flag       =   request.request_path_planning
-        self.Init_custom        =   request.start_point
-        self.Target_custom      =   request.goal_point
-
+        self.Init_custom        =   msg.start_point
+        self.Target_custom      =   msg.goal_point
 
         # Mode: 1 (현재 경로계획만 계산), 2 (현재 + 작년 경로계획과 같이 계산하여 정량평가까지 완료)
         # Node Input: Image 경로 & Mode & 시작점 & 도착점, Output: wp (or Cost도)
 
         if self.mode == 1:
-            if self.request_flag is True:
-                # model 90 deg
-                planner = PathPlanning(self.model_path, self.image_path)
-                planner.compute_path(self.Init_custom, self.Target_custom,
-                                 self.Step_Num_custom)  # start point , target point,step_num, max lidar, scale factor
-                planner.plot_binary("/home/user/px4_ros_ws/src/PathPlaning_data/SAC_Result_biary.png", self.Step_Num_custom)
-                planner.plot_original("/home/user/px4_ros_ws/src/PathPlaning_data/SAC_Result_og.png", self.Step_Num_custom)
-                print("                                          ")
-                print("=====   Path Planning Complete!!     =====")
+   
+            # model 90 deg
+            planner = PathPlanning(self.model_path, self.image_path)
+            planner.compute_path(self.Init_custom, self.Target_custom,
+                             self.Step_Num_custom)  # start point , target point,step_num, max lidar, scale factor
+            planner.plot_binary("/home/user/px4_ros_ws/src/PathPlaning_data/SAC_Result_biary.png", self.Step_Num_custom)
+            planner.plot_original("/home/user/px4_ros_ws/src/PathPlaning_data/SAC_Result_og.png", self.Step_Num_custom)
+            print("                                          ")
+            print("=====   Path Planning Complete!!     =====")
+            print("                                          ")
 
-                print("                                          ")
-                planner.print_distance_length()
-                print("                                           ")
+            planner.print_distance_length()
+            print("                                           ")
 
-                # setting service response
-                response.response_path_planning     =       True
-                response.waypoint_x                 =       planner.path_x.tolist()
-                response.waypoint_y                 =       planner.path_y.tolist()
-                response.waypoint_z                 =       planner.path_z.tolist()
+            # setting service response
+            self.path_planning_complete     =       True
+            self.waypoint_x                 =       planner.path_x.tolist()
+            self.waypoint_y                 =       planner.path_y.tolist()
+            self.waypoint_z                 =       planner.path_z.tolist()
 
-                print("                                          ")
-                print("======       Send response           =====")
-                print("                                          ")
-        
-                return response
+
+            self.local_waypoint_publish()
 
         elif self.mode == 2:
 

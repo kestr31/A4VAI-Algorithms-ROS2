@@ -20,9 +20,10 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'node_att_ctrl = a4vai.pathFollowing.node_att_ctrl:main',
+            'controller = a4vai.Controller.controller:main',
             'node_MPPI_output = a4vai.pathFollowing.node_MPPI_output:main',
-            'test_wayoint = a4vai.pathFollowing.get_waypoint:main'
+            'node_att_ctrl = a4vai.pathFollowing.node_att_ctrl:main',
+            'test_wayoint = a4vai.Controller.get_waypoint:main'
         ],
     },
 )

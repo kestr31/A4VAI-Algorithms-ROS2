@@ -3,7 +3,10 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 
-from .path_plan_service import PathPlanningService
+from .give_global_waypoint import GiveGlobalWaypoint
+
+from custom_msgs.msg import LocalWaypointSetpoint
+
 
 class Controller(Node):
 
@@ -15,7 +18,7 @@ class Controller(Node):
         self.waypoint_x         =   []
         self.waypoint_y         =   []
         self.waypoint_z         =   []
-
+        self.path_planning_complete = False
         # path planning position
         # [x, z, y]
         self.start_point        =   [1.0, 5.0, 1.0]
@@ -27,32 +30,27 @@ class Controller(Node):
         self.z                  =   0
 
         # path planning start
-        path_planning_service = PathPlanningService()
-        path_planning_service.request_path_planning(self.start_point, self.goal_point)
-        rclpy.spin_until_future_complete(path_planning_service, path_planning_service.future)
-        if path_planning_service.future.done():
-            try : 
-                path_planning_service.result = path_planning_service.future.result()
-            except Exception as e:
-                path_planning_service.get_logger().info(
-                    'Path Planning Service call failed %r' % (e,))
-            else :
-                path_planning_service.get_logger().info( "Path Planning Complete!! ")
-                if path_planning_service.result.response_path_planning is True :
-                    self.waypoint_x                 =   path_planning_service.result.waypoint_x
-                    self.waypoint_y                 =   path_planning_service.result.waypoint_y
-                    self.waypoint_z                 =   path_planning_service.result.waypoint_z
-                    self.path_planning_complete     = True
-                else :
-                    pass
-            finally : 
-                path_planning_service.destroy_node()
-        else : 
-            self.get_logger().warn("===== Path Planning Module Can't Response =====")
+        give_global_waypoint = GiveGlobalWaypoint()
+        give_global_waypoint.global_waypoint_publish(self.start_point, self.goal_point)
+        give_global_waypoint.destroy_node()
 
+
+        self.local_waypoint_subscriber = self.create_subscription(LocalWaypointSetpoint, '/local_waypoint_setpoint',self.path_planning_call_back, 10)
        
 
-        
+    def path_planning_call_back(self, msg):
+        self.path_planning_complete = msg.path_planning_complete
+        self.waypoint_x             = msg.waypoint_x 
+        self.waypoint_y             = msg.waypoint_y
+        self.waypoint_z             = msg.waypoint_z
+        print(self.waypoint_x)
+        print("                                          ")
+        print("=====   Path Planning Complete!!     =====")
+        print("                                          ")
+
+ 
+            
+
     #     # period of publishing waypoint from Controller to PathPlanning
     #     ##### can change period 
     #     self.waypoint_index_publish_period = 0.1

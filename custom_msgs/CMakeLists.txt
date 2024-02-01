@@ -8,10 +8,13 @@ find_package(builtin_interfaces REQUIRED)
 set(msg_files
   "msg/CustomMsg.msg"
   "msg/WaypointIndex.msg"
+  "msg/GlobalWaypointSetpoint.msg"
+  "msg/LocalWaypointSetpoint.msg"
+  "msg/ConveyingWaypointFlag.msg"
 )
 
 set(srv_files
-  "srv/WaypointSetpoint.srv"
+  "srv/PathFollowingSetpoint.srv"
 )
 
 
