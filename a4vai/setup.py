@@ -21,9 +21,10 @@ setup(
     entry_points={
         'console_scripts': [
             'controller = a4vai.Controller.controller:main',
-            'node_MPPI_output = a4vai.pathFollowing.node_MPPI_output:main',
-            'node_att_ctrl = a4vai.pathFollowing.node_att_ctrl:main',
-            'test_wayoint = a4vai.Controller.get_waypoint:main'
+            'node_MPPI_output = a4vai.PathFollowing.node_MPPI_output:main',
+            'node_att_ctrl = a4vai.PathFollowing.node_att_ctrl:main',
+            'Plan2WP = a4vai.PathPlanning.Plan2WP:main',
+            'get_waypoint = a4vai.Controller.get_waypoint:main',
         ],
     },
 )

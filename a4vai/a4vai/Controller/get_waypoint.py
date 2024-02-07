@@ -22,7 +22,7 @@ class Controller(Node):
         # path planning position
         # [x, z, y]
         self.start_point        =   [1.0, 5.0, 1.0]
-        self.goal_point         =   [950.0, 150.0, 950.0]
+        self.goal_point         =   [950.0, 10.0, 950.0]
 
         # NED position status
         self.x                  =   0
@@ -35,7 +35,7 @@ class Controller(Node):
         give_global_waypoint.destroy_node()
 
 
-        self.local_waypoint_subscriber = self.create_subscription(LocalWaypointSetpoint, '/local_waypoint_setpoint',self.path_planning_call_back, 10)
+        self.local_waypoint_subscriber = self.create_subscription(LocalWaypointSetpoint, '/local_waypoint_setpoint_from_PP',self.path_planning_call_back, 10)
        
 
     def path_planning_call_back(self, msg):
@@ -44,6 +44,8 @@ class Controller(Node):
         self.waypoint_y             = msg.waypoint_y
         self.waypoint_z             = msg.waypoint_z
         print(self.waypoint_x)
+        print(self.waypoint_y)
+        print(self.waypoint_z)
         print("                                          ")
         print("=====   Path Planning Complete!!     =====")
         print("                                          ")

@@ -21,9 +21,7 @@ class Controller(Node):
     def __init__(self):
         super().__init__('controller')
 
-
         # flag of stating
-        self.arm_flag               =   False
         self.take_off_flag          =   False
         self.initial_position_flag     =   False
 
@@ -48,6 +46,7 @@ class Controller(Node):
         self.offboard_setpoint_counter = 0
         self.offboard_start_flight_time = 10
 
+        self.path_following_flag = False
 
         ## initialize State Variable
         # NED Position 
@@ -70,12 +69,12 @@ class Controller(Node):
         self.q      =   0       # [rad/s]
         self.r      =   0       # [rad/s]
 
-        self.initial_position = [0.0, 0.0, -50.0]
+        self.initial_position = [0.0, 0.0, -11.0]
 
         ## initialize path planning parameter
         # path planning global waypoint [x, z, y]
         self.start_point        =   [1.0, 5.0, 1.0]
-        self.goal_point         =   [950.0, 150.0, 950.0]
+        self.goal_point         =   [950.0, 5.0, 950.0]
 
         # path planning waypoint list
         self.waypoint_x = []
@@ -165,14 +164,14 @@ class Controller(Node):
         self.vehicle_status_subscriber              =   self.create_subscription(VehicleStatus,           '/fmu/out/vehicle_status',           self.vehicle_status_callback,           qos_profile)
         self.PF_attitude_setpoint_subscriber_       =   self.create_subscription(VehicleAttitudeSetpoint, '/pf_att_2_control',               self.PF_Att2Control_callback,           10)
 
-
+        self.local_waypoint_subscriber = self.create_subscription(LocalWaypointSetpoint, '/local_waypoint_setpoint_from_PP',self.path_planning_call_back, 10)
+        self.local_waypoint_publisher = self.create_publisher(LocalWaypointSetpoint, '/local_waypoint_setpoint_to_PF', 10)
 
         period_offboard_control_mode =   0.2         # required about 5Hz for attitude control (proof that the external controller is healthy
         self.offboard_main_timer  =   self.create_timer(period_offboard_control_mode, self.offboard_control_main)
 
-        self.local_waypoint_subscriber = self.create_subscription(LocalWaypointSetpoint, '/local_waypoint_setpoint_from_PP',self.path_planning_call_back, 10)
-        self.local_waypoint_publisher = self.create_publisher(LocalWaypointSetpoint, '/local_waypoint_setpoint_to_PF', 10)
-
+        period_offboard_att_ctrl    =   0.004           # required 250Hz at least for attitude control
+        self.attitude_control_call_timer =  self.create_timer(period_offboard_att_ctrl, self.publisher_vehicle_attitude_setpoint)
 
     def path_planning_call_back(self, msg):
         self.path_planning_complete = msg.path_planning_complete
@@ -191,48 +190,44 @@ class Controller(Node):
         msg.waypoint_y             = self.waypoint_y
         msg.waypoint_z             = self.waypoint_z
         self.local_waypoint_publisher.publish(msg)
+        self.convey_local_waypoint_to_PF_complete = True
 
     def offboard_control_main(self):
 
-        # offboard mode
+        # send offboard mode and arm mode command 
         if self.offboard_setpoint_counter == self.offboard_start_flight_time :
             # offboard mode cmd
             self.publish_vehicle_command(self.prm_offboard_mode)
             # arm cmd
             self.publish_vehicle_command(self.prm_arm_mode)
-        else :
-            pass
+
+        # takeoff after a certain period of time
+        elif self.offboard_setpoint_counter <= self.offboard_start_flight_time:
+            self.offboard_setpoint_counter += 1
 
         # send offboard heartbeat signal
         self.publish_offboard_control_mode(self.prm_off_con_mod)
 
-        if self.offboard_setpoint_counter <= self.offboard_start_flight_time:
-            self.offboard_setpoint_counter += 1
-        else :
-            pass
+        # check initial position
+        if self.initial_position_flag == True:
 
-        if self.initial_position_flag   ==   True  :
+             # check path planning complete
+            if self.path_planning_complete == False :
+                # give global waypoint to path planning and path planning start
+                give_global_waypoint = GiveGlobalWaypoint()
+                give_global_waypoint.global_waypoint_publish(self.start_point, self.goal_point)
+                give_global_waypoint.destroy_node()
+            else:
+                pass
 
             if self.convey_local_waypoint_to_PF_complete == False :
                 self.Takeoff()
 
-            else :
+            else:
                 self.prm_off_con_mod.position   =   False
                 self.prm_off_con_mod.attitude   =   True
                 self.publish_offboard_control_mode(self.prm_off_con_mod)
-
-                period_offboard_att_ctrl    =   0.004           # required 250Hz at least for attitude control
-                self.attitude_control_call_timer =  self.create_timer(period_offboard_att_ctrl, self.publisher_vehicle_attitude_setpoint)
-
-            if self.path_planning_complete == False :
-                # path planning start
-                give_global_waypoint = GiveGlobalWaypoint()
-                give_global_waypoint.global_waypoint_publish(self.start_point, self.goal_point)
-                give_global_waypoint.destroy_node()
-
-                  
-            else :
-                pass
+                self.path_following_flag = True
 
         else :
             self.veh_trj_set.pos_NED    =   self.initial_position
@@ -261,7 +256,6 @@ class Controller(Node):
     def vehicle_status_callback(self, vehicle_status):
         self.vehicle_status = vehicle_status
 
-
     def Quaternion2Euler(self, w, x, y, z):
 
         t0 = +2.0 * (w * x + y * z)
@@ -278,8 +272,6 @@ class Controller(Node):
         yaw = math.atan2(t3, t4) * 57.2958
 
         return roll, pitch, yaw
-
-
 
     # publish_vehicle_command
     def publish_vehicle_command(self, prm_veh_com):
@@ -313,22 +305,6 @@ class Controller(Node):
         msg.yaw             =   veh_trj_set.yaw_rad
         self.trajectory_setpoint_publisher.publish(msg)
 
-    #.. publisher_vehicle_attitude_setpoint 
-    def publisher_vehicle_attitude_setpoint(self):
-        msg                 =   VehicleAttitudeSetpoint()
-        msg.roll_body       =   self.veh_att_set.roll_body
-        msg.pitch_body      =   self.veh_att_set.pitch_body
-        msg.yaw_body        =   self.veh_att_set.yaw_body
-        msg.yaw_sp_move_rate    =   self.veh_att_set.yaw_sp_move_rate
-        msg.q_d[0]          =   self.veh_att_set.q_d[0]
-        msg.q_d[1]          =   self.veh_att_set.q_d[1]
-        msg.q_d[2]          =   self.veh_att_set.q_d[2]
-        msg.q_d[3]          =   self.veh_att_set.q_d[3]
-        msg.thrust_body[0]  =   0.
-        msg.thrust_body[1]  =   0.
-        msg.thrust_body[2]  =   self.veh_att_set.thrust_body[2]
-        # self.vehicle_attitude_setpoint_publisher.publish(msg)
-
     def Takeoff(self):
         self.publish_trajectory_setpoint(self.veh_trj_set)
         if abs(self.z - self.initial_position[2]) < 0.3:
@@ -346,9 +322,24 @@ class Controller(Node):
         self.veh_att_set.thrust_body[0]  =   msg.thrust_body[0]
         self.veh_att_set.thrust_body[1]  =   msg.thrust_body[1]
         self.veh_att_set.thrust_body[2]  =   msg.thrust_body[2]
-        # self.vehicle_attitude_setpoint_publisher.publish(msg)     
 
-
+    def publisher_vehicle_attitude_setpoint(self):
+        if self.path_following_flag == True:
+            msg                 =   VehicleAttitudeSetpoint()
+            msg.roll_body       =   self.veh_att_set.roll_body
+            msg.pitch_body      =   self.veh_att_set.pitch_body
+            msg.yaw_body        =   self.veh_att_set.yaw_body
+            msg.yaw_sp_move_rate    =   self.veh_att_set.yaw_sp_move_rate
+            msg.q_d[0]          =   self.veh_att_set.q_d[0]
+            msg.q_d[1]          =   self.veh_att_set.q_d[1]
+            msg.q_d[2]          =   self.veh_att_set.q_d[2]
+            msg.q_d[3]          =   self.veh_att_set.q_d[3]
+            msg.thrust_body[0]  =   0.
+            msg.thrust_body[1]  =   0.
+            msg.thrust_body[2]  =   self.veh_att_set.thrust_body[2]
+            self.vehicle_attitude_setpoint_publisher.publish(msg)
+        else:
+            pass
 
 def main(args=None):
     print("======================================================")

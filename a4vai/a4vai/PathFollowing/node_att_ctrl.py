@@ -11,7 +11,7 @@ from std_msgs.msg import Float64MultiArray
 from std_msgs.msg import Int32MultiArray
 
 #.. PX4 libararies - sub.
-from px4_msgs.msg import VehicleLocalPosition
+from px4_msgs.msg import VehicleLocalPosition, TimesyncStatus
 from px4_msgs.msg import VehicleAttitude
 from px4_msgs.msg import VehicleAngularVelocity
 from px4_msgs.msg import HoverThrustEstimate 
@@ -61,7 +61,7 @@ class NodeAttCtrl(Node):
         #     HoverThrustEstimate     =   '/fmu/out/hover_thrust_estimate'
         #     VehicleAcceleration     =   '/fmu/out/vehicle_acceleration'
         #     ActuatorOutputs         =   '/fmu/out/actuator_outputs'
-
+            TimesyncStatus          =   '/fmu/out/timesync_status'
 
         # #.. publishers - from ROS2 msgs to px4 msgs
         # self.vehicle_command_publisher_             =   self.create_publisher(VehicleCommand, msg_mapping_ros2_to_px4.VehicleCommand, 10)
@@ -71,8 +71,6 @@ class NodeAttCtrl(Node):
         self.vehicle_local_position_subscriber      =   self.create_subscription(VehicleLocalPosition,    '/fmu/out/vehicle_local_position',   self.vehicle_local_position_callback,   qos_profile_sensor_data)
         self.vehicle_attitude_subscriber            =   self.create_subscription(VehicleAttitude,         '/fmu/out/vehicle_attitude',         self.vehicle_attitude_callback,         qos_profile_sensor_data)
         self.vehicle_angular_velocity_subscriber    =   self.create_subscription(VehicleAngularVelocity , '/fmu/out/vehicle_angular_velocity', self.vehicle_angular_velocity_callback, qos_profile_sensor_data)
-        
-
         # self.hover_thrust_estimate_subscription     =   self.create_subscription(HoverThrustEstimate, msg_mapping_ros2_to_px4.HoverThrustEstimate, self.subscript_hover_thrust_estimate, qos_profile_sensor_data)
         # self.vehicle_acceleration_subscription      =   self.create_subscription(VehicleAcceleration, msg_mapping_ros2_to_px4.VehicleAcceleration, self.subscript_vehicle_acceleration, qos_profile_sensor_data)
         # self.actuator_outputs_subscription          =   self.create_subscription(ActuatorOutputs, msg_mapping_ros2_to_px4.ActuatorOutputs, self.subscript_actuator_outputs, qos_profile_sensor_data)
@@ -119,6 +117,7 @@ class NodeAttCtrl(Node):
         
 
 
+        self.timesync_status_subscribe = False
 
         #.. variable - vehicle attitude setpoint
         class var_msg_veh_att_set:
@@ -190,7 +189,7 @@ class NodeAttCtrl(Node):
         self.waypoint_y         =   []
         self.waypoint_z         =   []
 
-        self.WP     =   Way_Point(self.wp_type_selection, self.waypoint_x, self.waypoint_y ,self.waypoint_z)
+        # self.WP     =   Way_Point(self.wp_type_selection, self.waypoint_x, self.waypoint_y ,self.waypoint_z)
 
 
 
@@ -284,11 +283,12 @@ class NodeAttCtrl(Node):
         #.. temp. parameter
         # self.hover_thrust = 0.7         # iris
         # self.hover_thrust = 0.41        # typhoon
-        self.hover_thrust = 0.35
+        self.hover_thrust = 0.541
         
         self.max_del_Psi     =   10. * m.pi/180.
         # self.max_del_Psi     =   5. * m.pi/180.
-        
+        self.first_time_flag = False
+        self.first_time = 0
         #.. etc.
         self.sim_time = 0.
         self.actuator_outputs = np.zeros(16)
@@ -324,7 +324,9 @@ class NodeAttCtrl(Node):
     
     #.. main_attitude_control 
     def main_attitude_control(self):
-
+        if self.timesync_status_subscribe == False:
+            self.timesync_status_subscription          =   self.create_subscription(TimesyncStatus, '/fmu/out/timesync_status', self.subscript_timesync_status, qos_profile_sensor_data)
+            self.timesync_status_subscribe = True
         if self.path_planning_complete == True and self.variable_setting_complete == False :
             #.. variable setting
             print("                                          ")
@@ -350,9 +352,9 @@ class NodeAttCtrl(Node):
 
         if self.variable_setting_complete == True :
             #.. sim_time
-            if self.takeoff_start:
-                current_time = int(Clock().now().nanoseconds / 1000) # time in microseconds
-                self.sim_time   =   (current_time - self.takeoff_time) / 1000000
+            # if self.takeoff_start:
+            #     current_time = int(Clock().now().nanoseconds / 1000) # time in microseconds
+            #     self.sim_time   =   (current_time - self.takeoff_time) / 1000000
 
             #.. variable setting
             self.Q6.Ri  =   self.est_state.pos_NED.copy()
@@ -449,8 +451,8 @@ class NodeAttCtrl(Node):
             self.att_ang_cmd    =   att_ang_cmd.copy()
 
             # takeoff
-            if self.sim_time < 0.5:
-                norm_thrust_cmd = 0.5
+            # if self.sim_time < 0.5:
+            #     norm_thrust_cmd = 0.5
 
             self.norm_thrust_cmd = norm_thrust_cmd
 
@@ -619,12 +621,14 @@ class NodeAttCtrl(Node):
     
     #.. publish_MPPI_input_dbl_WP
     def publish_MPPI_input_dbl_WP(self):
-        msg         =   Float64MultiArray()
-        msg.data    =   self.WP.WPs.reshape(self.WP.WPs.shape[0]*3,).tolist()
-        self.MPPI_input_dbl_WP_publisher_.publish(msg)
         # self.get_logger().info('publish_MPPI_input_dbl_WP: {0}'.format(msg.data))
+        if self.variable_setting_complete == True :
+            msg         =   Float64MultiArray()
+            msg.data    =   self.WP.WPs.reshape(self.WP.WPs.shape[0]*3,).tolist()
+            self.MPPI_input_dbl_WP_publisher_.publish(msg)
         # print(self.WP.WPs)
-        pass
+        else: 
+            pass
     
     #.. publish_GPR_input_dbl_NDO
     def publish_GPR_input_dbl_NDO(self):
@@ -745,7 +749,15 @@ class NodeAttCtrl(Node):
             self.Q6.guid_eta            = self.MPPI_ctrl_input[2]
         # self.get_logger().info('subscript_MPPI_output msgs: {0}'.format(msg.data))
         pass
-            
+
+    def subscript_timesync_status(self, msg):
+        if self.first_time_flag == False:
+            self.first_time =   msg.timestamp * 0.000001
+            self.first_time_flag = True
+            self.takeoff_start = True
+        else :
+            self.sim_time =   msg.timestamp * 0.000001 - self.first_time
+
     ### Mathmatics Functions 
     #.. Quaternion to Euler
     def Quaternion2Euler(self, w, x, y, z):

@@ -38,9 +38,7 @@ class Way_Point():
             
             self.WPs     =   np.array([ [0, 0, -h1],
                                 [wp0, wp0, -h1], [wp0 + d, wp0, -h2], [wp0 + d, wp0 + d, -h1], [wp0, wp0 + d, -h2], [wp0, wp0, -h1], 
-                                [0, 0, -h1]])
-            
-            
+                                [0, 0, -h1]])         
         #.. circle
         elif wp_type_selection == 2:
             # param.
@@ -62,9 +60,14 @@ class Way_Point():
             h       =   np.array(wpz)
 
             N = len(WPx)
+            # self.WPs        =   -10.*np.ones((N,3))
+            # self.WPs[:,0]   =   WPx
+            # self.WPs[:,1]   =   WPy
+            # self.WPs[:,2]   =   -h
+
             self.WPs        =   -10.*np.ones((N,3))
-            self.WPs[:,1]   =   WPx
-            self.WPs[:,0]   =   WPy
+            self.WPs[:,0]   =   WPx
+            self.WPs[:,1]   =   WPy
             self.WPs[:,2]   =   -h
             pass
         

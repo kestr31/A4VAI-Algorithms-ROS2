@@ -613,20 +613,27 @@ class PathPlanningServer(Node):  # topic 이름과 message 타입은 서로 매�
         self.bridge = CvBridge()
 
         # file path
-        self.image_path = '/home/user/px4_ros_ws/src/PathPlaning_data/1000-003.png'
-        self.model_path = "/home/user/px4_ros_ws/src/PathPlaning_data/90_exp_263k.onnx"
-        self.model_path2 = "/home/user/px4_ros_ws/src/PathPlaning_data/test26.onnx"
+        self.image_path = '/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/1000-003.png'
+        self.model_path = "/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/90_exp_263k.onnx"
+        self.model_path2 = "/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/test26.onnx"
 
         # initialize start and goal point
         self.Init_custom = [0.0,0.0,0.0]
         self.Target_custom = [0.0,0.0,0.0]
         
+        ## It needs to be changed
+        # mode change
+        # It will substitute hard coding to environment variable
         self.mode = 1
         
-
+        # path plannig complete flag
+        self.path_plannig_is_start  = False
+        self.path_planning_complete = False
         # create waypoint list server
-        self.global_waypoint_publisher = self.create_subscription(GlobalWaypointSetpoint, '/global_waypoint_setpoint', self.global_waypoint_callback ,10)
-        self.local_waypoint_publisher = self.create_publisher(LocalWaypointSetpoint, '/local_waypoint_setpoint_from_PP', 10)
+        self.global_waypoint_subscriber  = self.create_subscription(GlobalWaypointSetpoint, '/global_waypoint_setpoint', self.global_waypoint_callback ,10)
+
+        self.local_waypoint_publisher   = self.create_publisher(LocalWaypointSetpoint, '/local_waypoint_setpoint_from_PP', 10)
+        
         print("                                          ")
         print("===== Path Planning Node is Running  =====")
         print("                                          ")
@@ -653,25 +660,28 @@ class PathPlanningServer(Node):  # topic 이름과 message 타입은 서로 매�
 
     # if requested calculate waypoint and send response
     def global_waypoint_callback(self, msg):
+        if self.path_plannig_is_start == False and self.path_planning_complete == False:
+            print("                                          ")
+            print("===== Recieved Path Planning Request =====")
+            print("                                          ")
 
-        print("                                          ")
-        print("===== Recieved Path Planning Request =====")
-        print("                                          ")
-
-        self.Init_custom        =   msg.start_point
-        self.Target_custom      =   msg.goal_point
+            self.Init_custom        =   msg.start_point
+            self.Target_custom      =   msg.goal_point
+            self.path_plannig_is_start = True
+        else:
+            pass
 
         # Mode: 1 (현재 경로계획만 계산), 2 (현재 + 작년 경로계획과 같이 계산하여 정량평가까지 완료)
         # Node Input: Image 경로 & Mode & 시작점 & 도착점, Output: wp (or Cost도)
 
-        if self.mode == 1:
-   
+        if self.mode == 1 and self.path_planning_complete == False :
+
             # model 90 deg
             planner = PathPlanning(self.model_path, self.image_path)
             planner.compute_path(self.Init_custom, self.Target_custom,
                              self.Step_Num_custom)  # start point , target point,step_num, max lidar, scale factor
-            planner.plot_binary("/home/user/px4_ros_ws/src/PathPlaning_data/SAC_Result_biary.png", self.Step_Num_custom)
-            planner.plot_original("/home/user/px4_ros_ws/src/PathPlaning_data/SAC_Result_og.png", self.Step_Num_custom)
+            planner.plot_binary("/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/SAC_Result_biary.png", self.Step_Num_custom)
+            planner.plot_original("/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/SAC_Result_og.png", self.Step_Num_custom)
             print("                                          ")
             print("=====   Path Planning Complete!!     =====")
             print("                                          ")
@@ -694,15 +704,15 @@ class PathPlanningServer(Node):  # topic 이름과 message 타입은 서로 매�
             planner = PathPlanning(self.model_path, self.image_path)
             planner.compute_path(self.Init_custom, self.Target_custom,
                                  self.Step_Num_custom)  # start point , target point,step_num, max lidar, scale factor
-            planner.plot_binary("/home/user/px4_ros_ws/src/PathPlaning_data/SAC_Result_biary_01.png", self.Step_Num_custom)
-            planner.plot_original("/home/user/px4_ros_ws/src/PathPlaning_data/SAC_Result_og_01.png", self.Step_Num_custom)
+            planner.plot_binary("/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/SAC_Result_biary_01.png", self.Step_Num_custom)
+            planner.plot_original("/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/SAC_Result_og_01.png", self.Step_Num_custom)
 
 
             # model test26
             planner2 = PathPlanning(self.model_path2, self.image_path)
             planner2.compute_path(self.Init_custom, self.Target_custom, self.Step_Num_custom)  # start point , target point,
-            planner2.plot_binary("/home/user/px4_ros_ws/src/PathPlaning_data/SAC_Result_biary_02.png", self.Step_Num_custom)
-            planner2.plot_original("/home/user/px4_ros_ws/src/PathPlaning_data/SAC_Result_og_02.png", self.Step_Num_custom)
+            planner2.plot_binary("/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/SAC_Result_biary_02.png", self.Step_Num_custom)
+            planner2.plot_original("/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/SAC_Result_og_02.png", self.Step_Num_custom)
 
             # Cost Calculation
             ratio = planner.print_distance_length()
@@ -722,8 +732,8 @@ class PathPlanningServer(Node):  # topic 이름과 message 타입은 서로 매�
             planner = PathPlanning(self.model_path, self.image_path)
             planner.compute_path(self.Init_custom, self.Target_custom,
                                  self.Step_Num_custom)  # start point , target point,step_num, max lidar, scale factor
-            planner.plot_binary("/home/user/px4_ros_ws/src/PathPlaning_data/SAC_Result_binary.png", self.Step_Num_custom)
-            planner.plot_original("/home/user/px4_ros_ws/src/PathPlaning_data/SAC_Result_og.png", self.Step_Num_custom)
+            planner.plot_binary("/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/SAC_Result_binary.png", self.Step_Num_custom)
+            planner.plot_original("/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/SAC_Result_og.png", self.Step_Num_custom)
 
             # RRT
             start_coord = (self.Init_custom[0],self.Init_custom[2])  # Replace with your desired start coordinates
@@ -739,8 +749,8 @@ class PathPlanningServer(Node):  # topic 이름과 message 타입은 서로 매�
                 planner3.RRT_PathPlanning(start_coord, goal_coord)
 
                 # Plot the results
-                planner3.plot_RRT(f"/home/user/px4_ros_ws/src/PathPlaning_data/Results_Images/RRT_Result_og_{i+1}.png")
-                planner3.plot_RRT_binary(f"/home/user/px4_ros_ws/src/PathPlaning_data/Results_Images/RRT_Result_Binary_{i+1}.png")
+                planner3.plot_RRT(f"/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/Results_Images/RRT_Result_og_{i+1}.png")
+                planner3.plot_RRT_binary(f"/home/user/px4_ros_ws/src/a4vai/a4vai/PathPlanning/PathPlaning_data/Results_Images/RRT_Result_Binary_{i+1}.png")
 
                 # Calculate and print the distance ratio
                 distance_ratio = planner3.print_distance_length()
