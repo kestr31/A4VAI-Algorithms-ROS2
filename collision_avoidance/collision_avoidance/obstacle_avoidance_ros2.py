@@ -35,10 +35,6 @@ class JBNU_Collision(Node):
         self.path_following_heartbeat_subscriber        =   self.create_subscription(Heartbeat, '/path_following_heartbeat',        self.path_following_heartbeat_call_back,        10)
         self.path_planning_heartbeat_subscriber         =   self.create_subscription(Heartbeat, '/path_planning_heartbeat',         self.path_planning_heartbeat_call_back,         10)
 
-        # declare heartbeat_timer
-        period_heartbeat_mode =   1        
-        self.heartbeat_timer  =   self.create_timer(period_heartbeat_mode, self.publish_heartbeat)
-
 
         self.image = []
 #############################################################################################################
@@ -57,6 +53,11 @@ class JBNU_Collision(Node):
 
         self.collision_avoidance_period = 0.02
         self.collision_avoidance_timer =  self.create_timer(self.collision_avoidance_period, self.collision_avoidance)
+        
+        
+        # declare heartbeat_timer
+        period_heartbeat_mode =   1        
+        self.heartbeat_timer  =   self.create_timer(period_heartbeat_mode, self.publish_heartbeat)
 
 
     def collision_avoidance(self):
