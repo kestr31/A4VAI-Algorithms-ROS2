@@ -2,6 +2,7 @@
 import numpy as np
 import math as m
 
+#===================================================================================================================
 #.. ROS libraries
 import rclpy
 from rclpy.node import Node
@@ -10,13 +11,11 @@ from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import Float64MultiArray
 from std_msgs.msg import Int32MultiArray
 
-#.. PF algorithms libararies
-from .PF_modules.quadrotor_6dof import Quadrotor_6DOF
-from .PF_modules.virtual_target import Virtual_Target
-from .PF_modules.set_parameter import MPPI_Guidance_Parameter, Way_Point
-from .PF_modules.MPPI_guidance import MPPI_Guidance_Modules
-from .PF_modules.GPR import GPR_Modules
-
+#===================================================================================================================
+#.. private libs.
+from .necessary_settings import waypoint, quadrotor_iris_parameters
+from .models import quadrotor
+from .flight_functions import MPPI_guidance, GPR
 
 
 class Node_MPPI_Output(Node):
@@ -24,11 +23,32 @@ class Node_MPPI_Output(Node):
     def __init__(self):
         super().__init__('node_MPPI_output')
         
-        #.. Reference        
-        #   [1]: https://hostramus.tistory.com/category/ROS2
+        #.. model settings
+        Iris_Param_Physical      = quadrotor_iris_parameters.Physical_Parameter()
+        Iris_Param_GnC           = quadrotor_iris_parameters.GnC_Parameter(3)
+        MPPI_Param               = quadrotor_iris_parameters.MPPI_Parameter(Iris_Param_GnC.Guid_type)
+        GPR_Param                = quadrotor_iris_parameters.GPR_Parameter(Iris_Param_GnC.dt_GCU, MPPI_Param.N)
+        self.QR                  = quadrotor.Quadrotor_6DOF(Iris_Param_Physical, Iris_Param_GnC, MPPI_Param, GPR_Param)
+        self.WP                  = waypoint.Waypoint()
+
+        #.. gpr and mppi settings
+        self.GP                  = GPR.GPR_Modules(GPR_Param)
+        # self.QR.guid_var.MPPI_ctrl_input = np.array([MPPI_Param.u1_init, MPPI_Param.u2_init, MPPI_Param.u3_init]) 
         
-        #.. publishers - from ROS2 msgs to ROS2 msgs
-        self.MPPI_output_publisher_     =   self.create_publisher(Float64MultiArray, 'MPPI/out/dbl_MPPI', 10)
+        #===================================================================================================================
+        #.. variable initialization
+        self.sim_time = 0.       
+        self.MPPI_input_int_Q6_received = False
+        self.MPPI_input_dbl_WP_received = False
+        self.MPPI_setting_complete      = False
+ 
+        # self.GPRlog_t = open("/home/user/log/point_mass_6d/datalogfile/GPRlog_t.txt",'w+')
+        # self.GPRlog_X = open("/home/user/log/point_mass_6d/datalogfile/GPRlog_X.txt",'w+')
+        # self.GPRlog_Y = open("/home/user/log/point_mass_6d/datalogfile/GPRlog_Y.txt",'w+')
+        # self.GPRlog_Z = open("/home/user/log/point_mass_6d/datalogfile/GPRlog_Z.txt",'w+')
+                
+        #===================================================================================================================
+        ###.. Subscribers ..###
 
         #.. subscriptions - from ROS2 msgs to ROS2 msgs
         self.MPPI_input_int_Q6_subscription =   self.create_subscription(Int32MultiArray, 'MPPI/in/int_Q6', self.subscript_MPPI_input_int_Q6, qos_profile_sensor_data)
@@ -36,172 +56,96 @@ class Node_MPPI_Output(Node):
         self.MPPI_input_dbl_VT_subscription =   self.create_subscription(Float64MultiArray, 'MPPI/in/dbl_VT', self.subscript_MPPI_input_dbl_VT, qos_profile_sensor_data)
         self.MPPI_input_dbl_WP_subscription =   self.create_subscription(Float64MultiArray, 'MPPI/in/dbl_WP', self.subscript_MPPI_input_dbl_WP, qos_profile_sensor_data)
         self.GPR_input_dbl_NDO_subscription =   self.create_subscription(Float64MultiArray, 'GPR/in/dbl_Q6', self.subscript_GPR_input_dbl_NDO, qos_profile_sensor_data)
-                
-        ###### - start - Vars. for MPPI algorithm ######
-        #.. declare variables/instances
-        self.Q6     =   Quadrotor_6DOF()
-        self.VT     =   Virtual_Target()
         
-        # # .. declare waypoint
-        self.WP     =   Way_Point(0)
-        
-        #.. MPPI setting
-        # parameter
-        type_MPPI   =   self.Q6.Guid_type   # 0~1: no use MPPI | 2: direct accel cmd | 3: guidance-based |
-        self.MP     =   MPPI_Guidance_Parameter(type_MPPI)
-        
-        # callback PF_MPPI_param
-        period_MPPI_param       =   self.MP.dt
-        self.timer  =   self.create_timer(period_MPPI_param, self.PF_MPPI_param)
-        
-        # module
-        self.MG      =   MPPI_Guidance_Modules(self.MP)
-        # initialization
-        self.MG.set_total_MPPI_code()
-        self.MG.set_MPPI_entropy_calc_code()
-        
-        self.MPPI_ctrl_input = np.array([self.MP.u1_init, self.MP.u2_init, self.MP.u3_init])
-        print(self.MPPI_ctrl_input)
-        
-        ###### -  end  - Vars. for MPPI algorithm ######
-        
-        
-        
-        ###### - start - Vars. for GPR algorithm ######
-        
-        #.. GPR setting
-        dt_GPR = 0.01
-        dt_GPR_opt   =   15.* dt_GPR
-        dt_GPR_est   =   0.025  # the half of dt_MPPI
-        self.GPR = GPR_Modules(dt_GPR) 
-        self.sim_time = 0.
-        
-        # callback GPR
-        self.timer  =   self.create_timer(dt_GPR_opt, self.GPR_HyperParamsOpt)
-        self.timer  =   self.create_timer(dt_GPR_est, self.GPR_Forecasting)
-        
-        
-        # #.. callback GPR_logger
-        # self.period_GPR_logger = 1.
-        # self.timer  =   self.create_timer(self.period_GPR_logger, self.GPR_logger)
-        # self.GPRlog_t = open("/home/user/log/point_mass_6d/datalogfile/GPRlog_t.txt",'w+')
-        # self.GPRlog_X = open("/home/user/log/point_mass_6d/datalogfile/GPRlog_X.txt",'w+')
-        # self.GPRlog_Y = open("/home/user/log/point_mass_6d/datalogfile/GPRlog_Y.txt",'w+')
-        # self.GPRlog_Z = open("/home/user/log/point_mass_6d/datalogfile/GPRlog_Z.txt",'w+')
-        
-        ###### -  end  - Vars. for GPR algorithm ######
-        
-        pass
-        
-    ###.. MPPI functions ..###
-    #.. PF_MPPI_param 
-    def PF_MPPI_param(self):
-        #.. disturbance in MPPI
-        self.MG.Ai_est_dstb[:,0] = self.Q6.Ai_est_dstb[0]*np.ones(self.MG.MP.N)
-        self.MG.Ai_est_dstb[:,1] = self.Q6.Ai_est_dstb[1]*np.ones(self.MG.MP.N)
-        self.MG.Ai_est_dstb[:,2] = self.Q6.Ai_est_dstb[2]*np.ones(self.MG.MP.N)
-        #.. MPPI algorithm
-        MPPI_ctrl_input1, MPPI_ctrl_input2    =   self.MG.run_MPPI_Guidance(self.Q6, self.WP.WPs, self.VT)
-        self.MPPI_ctrl_input    =   MPPI_ctrl_input1.copy()
-        self.publish_MPPI_output()
-        # self.get_logger().info("subscript_MPPI_output: [0]=" + str(self.MPPI_ctrl_input[0]) +", [1]=" + str(self.MPPI_ctrl_input[1]) +", [2]=" + str(self.MPPI_ctrl_input[2]))
-        pass
-    
-    
-    ###.. GPR functions ..###
-    #.. GPR_HyperParamsOpt 
-    def GPR_HyperParamsOpt(self):
-        
-        if self.Q6.WP_idx_passed >= 1:
-            self.GPR.HyperParamsOpt()
-        
-        pass
-    
-    #.. GPR_Update 
-    def GPR_Update(self):
-        
-        # if self.Q6.WP_idx_passed >= 1:
-        self.GPR.GPR_Update(self.Q6.out_NDO)
-        
-        pass
-    
-    #.. GPR_Forecasting 
-    def GPR_Forecasting(self):
-        
-        if self.Q6.WP_idx_passed >= 1:
-            self.GPR.GPR_Forecasting(self.sim_time)
-            
-    #.. GPR_logger
-    def GPR_logger(self):
-        if self.Q6.WP_idx_passed >= 1:
-            print(self.GPR.te_array[0:10])
-            print(self.GPR.me_x_array[0:10])
-            np.savetxt(self.GPRlog_t, self.GPR.te_array.reshape(1, self.GPR.ne_GPR), delimiter=' ')
-            np.savetxt(self.GPRlog_X, self.GPR.me_x_array.reshape(1, self.GPR.ne_GPR), delimiter=' ')
-            np.savetxt(self.GPRlog_Y, self.GPR.me_y_array.reshape(1, self.GPR.ne_GPR), delimiter=' ')
-            np.savetxt(self.GPRlog_Z, self.GPR.me_z_array.reshape(1, self.GPR.ne_GPR), delimiter=' ')
-                    
-    ###.. publushers ..###
+        #===================================================================================================================
+        ###.. Publishers ..###
 
-    #.. publish_MPPI_output
-    def publish_MPPI_output(self):
-        msg                 =   Float64MultiArray()
-        msg.data            =   [self.MPPI_ctrl_input[0], self.MPPI_ctrl_input[1], self.MPPI_ctrl_input[2]]
-        self.MPPI_output_publisher_.publish(msg)
-        # self.get_logger().info('publish_MPPI_output msgs: {0}'.format(msg.data))
-        # self.get_logger().info("subscript_MPPI_output: [0]=" + str(self.MPPI_ctrl_input[0]) +", [1]=" + str(self.MPPI_ctrl_input[1]) +", [2]=" + str(self.MPPI_ctrl_input[2]))
+        #.. publishers - from ROS2 msgs to ROS2 msgs
+        self.MPPI_output_publisher_         =   self.create_publisher(Float64MultiArray, 'MPPI/out/dbl_MPPI', 10)
+
+        #===================================================================================================================
+        ###.. Timers ..###
+
+        # callback PF_MPPI_param
+        period_MPPI_param       =   self.QR.MPPI_param.dt_MPPI
+        dt_GPR_opt              =   self.QR.GPR_param.dt_GPR_opt
+        period_GPR_logger       =   1.
+
+        self.timer  =   self.create_timer(period_MPPI_param, self.PF_MPPI_param)
+        self.timer  =   self.create_timer(dt_GPR_opt, self.GPR_HyperParamsOpt)
+        # self.timer  =   self.create_timer(period_GPR_logger, self.GPR_logger)
+
         pass
-        
     
-        
-    ### subscriptions
+    #===================================================================================================================
+    # Subscriber Call Back Functions  
+    #===================================================================================================================
+
     #.. subscript_MPPI_input_int_Q6
     def subscript_MPPI_input_int_Q6(self, msg):
-        self.Q6.WP_idx_heading  =   msg.data[0]
-        self.Q6.WP_idx_passed   =   msg.data[1]
-        self.Q6.Guid_type       =   msg.data[2]
-        self.Q6.flag_guid_trans =   msg.data[3]
+        self.QR.PF_var.WP_idx_heading  =   msg.data[0]
+        self.QR.PF_var.WP_idx_passed   =   msg.data[1]
+        self.QR.GnC_param.Guid_type    =   msg.data[2]
+
+        self.MPPI_input_int_Q6_received =  True
         # self.get_logger().info('subscript_MPPI_input_int_Q6 msgs: {0}'.format(msg.data))
         pass
     
     #.. subscript_MPPI_input_dbl_Q6
     def subscript_MPPI_input_dbl_Q6(self, msg):
-        self.Q6.throttle_hover      =   msg.data[0]
-        tmp_float                   =   msg.data[1]
-        self.Q6.desired_speed       =   msg.data[2]
-        self.Q6.look_ahead_distance =   msg.data[3]
-        self.Q6.distance_change_WP  =   msg.data[4]
-        self.Q6.Kp_vel              =   msg.data[5]
-        self.Q6.Kd_vel              =   msg.data[6]
-        self.Q6.Kp_speed            =   msg.data[7]
-        self.Q6.Kd_speed            =   msg.data[8]
-        self.Q6.guid_eta            =   msg.data[9]
-        self.Q6.tau_phi             =   msg.data[10]
-        self.Q6.tau_the             =   msg.data[11]
-        self.Q6.tau_psi             =   msg.data[12]
-        self.Q6.Ri[0]               =   msg.data[13]
-        self.Q6.Ri[1]               =   msg.data[14]
-        self.Q6.Ri[2]               =   msg.data[15]
-        self.Q6.Vi[0]               =   msg.data[16]
-        self.Q6.Vi[1]               =   msg.data[17]
-        self.Q6.Vi[2]               =   msg.data[18]
-        self.Q6.Ai[0]               =   msg.data[19]
-        self.Q6.Ai[1]               =   msg.data[20]
-        self.Q6.Ai[2]               =   msg.data[21]
-        self.Q6.thr_unitvec[0]      =   msg.data[22]
-        self.Q6.thr_unitvec[1]      =   msg.data[23]
-        self.Q6.thr_unitvec[2]      =   msg.data[24]
-        self.Q6.Ai_est_dstb[0]      =   msg.data[25]
-        self.Q6.Ai_est_dstb[1]      =   msg.data[26]
-        self.Q6.Ai_est_dstb[2]      =   msg.data[27]
+        self.QR.state_var.Ri[0]                         =   msg.data[0]
+        self.QR.state_var.Ri[1]                         =   msg.data[1]
+        self.QR.state_var.Ri[2]                         =   msg.data[2]
+        self.QR.state_var.Vi[0]                         =   msg.data[3]
+        self.QR.state_var.Vi[1]                         =   msg.data[4]
+        self.QR.state_var.Vi[2]                         =   msg.data[5]
+        self.QR.state_var.att_ang[0]                    =   msg.data[6]
+        self.QR.state_var.att_ang[1]                    =   msg.data[7]
+        self.QR.state_var.att_ang[2]                    =   msg.data[8]
+        self.QR.guid_var.T_cmd                          =   msg.data[9]
+
+        # self.QR.state_var.Ri[0]                         =   msg.data[0]
+        # self.QR.state_var.Ri[1]                         =   msg.data[1]
+        # self.QR.state_var.Ri[2]                         =   msg.data[2]
+        # self.QR.state_var.Vi[0]                         =   msg.data[3]
+        # self.QR.state_var.Vi[1]                         =   msg.data[4]
+        # self.QR.state_var.Vi[2]                         =   msg.data[5]
+        # self.QR.state_var.att_ang[0]                    =   msg.data[6]
+        # self.QR.state_var.att_ang[1]                    =   msg.data[7]
+        # self.QR.state_var.att_ang[2]                    =   msg.data[8]
+        # self.QR.physical_param.throttle_hover           =   msg.data[9]
+        # self.QR.physical_param.mass                     =   msg.data[10]
+        # self.QR.GnC_param.desired_speed                 =   msg.data[11]
+        # self.QR.GnC_param.virtual_target_distance       =   msg.data[12]
+        # self.QR.GnC_param.distance_change_WP            =   msg.data[13]
+        # self.QR.GnC_param.dist_change_first_WP          =   msg.data[14]
+        # self.QR.GnC_param.Kp_vel                        =   msg.data[15]
+        # self.QR.GnC_param.Kd_vel                        =   msg.data[16]
+        # self.QR.GnC_param.Kp_speed                      =   msg.data[17]
+        # self.QR.GnC_param.Kd_speed                      =   msg.data[18]
+        # self.QR.GnC_param.guid_eta                      =   msg.data[19]
+        # self.QR.GnC_param.tau_phi                       =   msg.data[20]
+        # self.QR.GnC_param.tau_the                       =   msg.data[21]
+        # self.QR.GnC_param.tau_psi                       =   msg.data[22]
+        # self.QR.GnC_param.tau_p                         =   msg.data[23]
+        # self.QR.GnC_param.tau_q                         =   msg.data[24]
+        # self.QR.GnC_param.tau_r                         =   msg.data[25]
+        # self.QR.GnC_param.alpha_p                       =   msg.data[26]
+        # self.QR.GnC_param.alpha_q                       =   msg.data[27]
+        # self.QR.GnC_param.alpha_r                       =   msg.data[28]
+        # self.QR.guid_var.T_cmd                          =   msg.data[29]
+        # self.QR.physical_param.psuedo_rotor_drag_coeff  =   msg.data[30]
+        # self.QR.GnC_param.del_psi_cmd_limit             =   msg.data[31]
+        # self.QR.GnC_param.tau_Wb                        =   msg.data[32]
+
         # self.get_logger().info('subscript_MPPI_input_dbl_Q6 msgs: {0}'.format(msg.data))
         pass
             
     #.. subscript_MPPI_input_dbl_VT
     def subscript_MPPI_input_dbl_VT(self, msg):
-        self.VT.Ri[0]   =   msg.data[0]
-        self.VT.Ri[1]   =   msg.data[1]
-        self.VT.Ri[2]   =   msg.data[2]
+        self.QR.PF_var.VT_Ri[0]   =   msg.data[0]
+        self.QR.PF_var.VT_Ri[1]   =   msg.data[1]
+        self.QR.PF_var.VT_Ri[2]   =   msg.data[2]
         # self.get_logger().info('subscript_MPPI_input_dbl_VT msgs: {0}'.format(msg.data))
         pass
             
@@ -209,21 +153,106 @@ class Node_MPPI_Output(Node):
     def subscript_MPPI_input_dbl_WP(self, msg):
         WPs_tmp         =   np.array(msg.data)
         self.WP.WPs     =   WPs_tmp.reshape(int(WPs_tmp.shape[0]/3),3)
+
+        self.MPPI_input_dbl_WP_received =  True
         # self.get_logger().info('subscript_MPPI_input_dbl_WP msgs: {0}'.format(msg.data))
-        # print(self.WP.WPs)
         pass
     
-            
     #.. subscript_GPR_input_dbl_NDO
     def subscript_GPR_input_dbl_NDO(self, msg):
-        self.sim_time       =   msg.data[0]
-        self.Q6.out_NDO[0]  =   msg.data[1]
-        self.Q6.out_NDO[1]  =   msg.data[2]
-        self.Q6.out_NDO[2]  =   msg.data[3]
+        self.sim_time                =   msg.data[0]
+        self.QR.guid_var.out_NDO[0]  =   msg.data[1]
+        self.QR.guid_var.out_NDO[1]  =   msg.data[2]
+        self.QR.guid_var.out_NDO[2]  =   msg.data[3]
         # self.get_logger().info('subscript_GPR_input_dbl_NDO msgs: {0}'.format(msg.data))
         
-        self.GPR_Update()
+        self.GP.GPR_update(self.QR.guid_var.out_NDO)
         pass
+
+    #===================================================================================================================
+    # Publication Functions   
+    #===================================================================================================================
+    
+    #.. publish_MPPI_output
+    def publish_MPPI_output(self):
+        msg                 =   Float64MultiArray()
+        msg.data            =   [self.QR.guid_var.MPPI_ctrl_input[0], self.QR.guid_var.MPPI_ctrl_input[1], self.QR.guid_var.MPPI_ctrl_input[2]]
+        
+        self.MPPI_output_publisher_.publish(msg)
+        # self.get_logger().info('publish_MPPI_output msgs: {0}'.format(msg.data))
+        # self.get_logger().info("subscript_MPPI_output: [0]=" + str(self.MPPI_ctrl_input[0]) +", [1]=" + str(self.MPPI_ctrl_input[1]) +", [2]=" + str(self.MPPI_ctrl_input[2]))
+        pass
+
+    #===================================================================================================================
+    # Functions
+    #===================================================================================================================
+
+    ###.. MPPI functions ..###
+    #.. PF_MPPI_param 
+    def PF_MPPI_param(self):
+    
+        if self.MPPI_input_int_Q6_received == True and self.MPPI_input_dbl_WP_received == True and self.MPPI_setting_complete == False:
+            
+            self.MG  = MPPI_guidance.MPPI_Guidance_Modules(self.QR.MPPI_param)
+            self.MG.set_MPPI_entropy_calc_code()
+            self.MG.set_total_MPPI_code(self.WP.WPs.shape[0])
+            
+            self.get_logger().info('MPPI SETTING COMPLETE')
+            self.MPPI_setting_complete = True
+            pass
+        else:
+            pass
+
+        if self.MPPI_setting_complete == True:
+            if self.QR.PF_var.WP_idx_passed >= 1:
+                self.GP.GPR_forecasting(self.sim_time)
+
+                #.. disturbance in MPPI
+                self.MG.Ai_est_dstb[:,0] = self.GP.GP_param.me_x_array
+                self.MG.Ai_est_dstb[:,1] = self.GP.GP_param.me_y_array
+                self.MG.Ai_est_dstb[:,2] = self.GP.GP_param.me_z_array
+        
+                # self.MG.Ai_est_dstb[:,0] = self.QR.guid_var.out_NDO[0]*np.ones(self.MG.MP.N)
+                # self.MG.Ai_est_dstb[:,1] = self.QR.guid_var.out_NDO[1]*np.ones(self.MG.MP.N)
+                # self.MG.Ai_est_dstb[:,2] = self.QR.guid_var.out_NDO[2]*np.ones(self.MG.MP.N)
+            else:
+                self.MG.Ai_est_dstb[:,0] = self.QR.guid_var.out_NDO[0]*np.ones(self.MG.MP.N)
+                self.MG.Ai_est_dstb[:,1] = self.QR.guid_var.out_NDO[1]*np.ones(self.MG.MP.N)
+                self.MG.Ai_est_dstb[:,2] = self.QR.guid_var.out_NDO[2]*np.ones(self.MG.MP.N)
+
+            #.. MPPI algorithm
+            self.QR.guid_var.MPPI_ctrl_input, self.QR.guid_var.MPPI_calc_time = self.MG.run_MPPI_Guidance(self.QR, self.WP.WPs)
+
+            self.publish_MPPI_output()
+        else:
+            pass
+
+        # self.get_logger().info("subscript_MPPI_output: " + str(self.MPPI_ctrl_input[0]) +", [1]=" + str(self.MPPI_ctrl_input[1]) +", [2]=" + str(self.MPPI_ctrl_input[2]))
+        pass
+    
+    ###.. GPR functions ..###
+    #.. GPR_HyperParamsOpt 
+    def GPR_HyperParamsOpt(self):
+        
+        if self.QR.PF_var.WP_idx_passed >= 1:
+            self.GP.GPR_hyperparams_opt()
+        
+        pass
+
+                
+    #.. GPR_logger
+    def GPR_logger(self):
+        if self.QR.PF_var.WP_idx_passed >= 1:
+            # print(self.GP.GP_param.te_array[0:10])
+            # print(self.GP.GP_param.me_x_array[0:10])
+            # np.savetxt(self.GPRlog_t, self.GPR.te_array.reshape(1, self.GPR.ne_GPR), delimiter=' ')
+            # np.savetxt(self.GPRlog_X, self.GPR.me_x_array.reshape(1, self.GPR.ne_GPR), delimiter=' ')
+            # np.savetxt(self.GPRlog_Y, self.GPR.me_y_array.reshape(1, self.GPR.ne_GPR), delimiter=' ')
+            # np.savetxt(self.GPRlog_Z, self.GPR.me_z_array.reshape(1, self.GPR.ne_GPR), delimiter=' ')
+            pass
+    
+        
+    
     
     
     

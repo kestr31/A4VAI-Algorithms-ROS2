@@ -78,7 +78,7 @@ class Quadrotor_6DOF():
         self.dt_GCU     =   0.004
         # self.Guid_type  =   0       # | 0: PD control | 1: guidance law | 2: MPPI direct accel cmd | 3: MPPI guidance-based |
         # self.Guid_type  =   1       # | 0: PD control | 1: guidance law | 2: MPPI direct accel cmd | 3: MPPI guidance-based |
-        self.Guid_type  =   3       # | 0: PD control | 1: guidance law | 2: MPPI direct accel cmd | 3: MPPI guidance-based |
+        self.Guid_type  =   1       # | 0: PD control | 1: guidance law | 2: MPPI direct accel cmd | 3: MPPI guidance-based |
         self.flag_guid_trans    =   1
         self.desired_speed      =   3.0
         self.look_ahead_distance    =   self.desired_speed * 1.5

@@ -65,10 +65,10 @@ class Way_Point():
             # self.WPs[:,1]   =   WPy
             # self.WPs[:,2]   =   -h
 
-            self.WPs        =   -5.*np.ones((N,3))
+            self.WPs        =   -10.*np.ones((N,3))
             self.WPs[:,0]   =   WPx
             self.WPs[:,1]   =   WPy
-            # self.WPs[:,2]   =   -h/100
+            self.WPs[:,2]   =   -h
             pass
         
         else:

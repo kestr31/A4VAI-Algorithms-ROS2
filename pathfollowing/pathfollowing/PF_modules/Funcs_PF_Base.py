@@ -48,21 +48,6 @@ def distance_from_Q6_to_path(WP_WPs, Q6_WP_idx_heading, Q6_Ri, Q6_p_closest_on_p
             pass
         pass
     return dist_to_path, Q6_p_closest_on_path, Q6_WP_idx_passed, unit_Rw1w2
-
-    # Rw1w2       =   WP_WPs[Q6_WP_idx_heading] - WP_WPs[Q6_WP_idx_heading-1]
-    # mag_Rw1w2   =   norm(Rw1w2)
-    # Rw1q        =   Q6_Ri - WP_WPs[Q6_WP_idx_heading-1]
-    # mag_w1p     =   min(max(np.dot(Rw1w2, Rw1q)/max(mag_Rw1w2,0.001), 0.), mag_Rw1w2)
-    # p_closest_on_path   =   WP_WPs[Q6_WP_idx_heading-1] + mag_w1p * Rw1w2/max(mag_Rw1w2,0.001)
-        
-    # mag_Rqp     =   norm(p_closest_on_path - Q6_Ri)
-
-    # unit_Rw1w2      =   Rw1w2/max(mag_Rw1w2,0.001)
-    # dist_to_path    =   mag_Rqp
-    # Q6_p_closest_on_path    =   p_closest_on_path
-    # Q6_WP_idx_passed        =   Q6_WP_idx_heading - 1
-
-    # return dist_to_path, Q6_p_closest_on_path, Q6_WP_idx_passed, unit_Rw1w2
     
     
 #.. check waypoint - quadrotor
