@@ -22,68 +22,69 @@ def guidance_modules(QR_Guid_type, QR_WP_idx_passed, QR_WP_idx_heading, WP_WPs_s
     
     # starting phase
     if QR_WP_idx_passed < 1:
-        QR_Guid_type = 0
-        QR_desired_speed = 0.5
+        QR_Guid_type     = 0
+        QR_desired_speed = 3.0
         pass
+
     # terminal phase
     if (QR_WP_idx_heading == (WP_WPs_shape0 - 1)):
         QR_Guid_type = 0
         pass
-            
+
     # guidance command
     Aqi_cmd     =   np.zeros(3)
     if QR_Guid_type == 0 or QR_Guid_type == 4:
         if QR_Guid_type == 4:
             QR_desired_speed = MPPI_ctrl_input[1]
-            QR_Kp_vel = MPPI_ctrl_input[2]
+            QR_Kp_vel        = MPPI_ctrl_input[2]
         #.. guidance - position & velocity control
         # position control
-        err_Ri      =   VT_Ri - QR_Ri
-        Kp_pos      =   QR_desired_speed/max(np.linalg.norm(err_Ri),QR_desired_speed)     # (terminal WP, tgo < 1) --> decreasing speed
-        derr_Ri     =   0. - QR_Vi
-        Vqi_cmd     =   Kp_pos * err_Ri
-        dVqi_cmd    =   Kp_pos * derr_Ri
+        err_Ri               = VT_Ri - QR_Ri
+        Kp_pos               = QR_desired_speed/max(np.linalg.norm(err_Ri),QR_desired_speed)     # (terminal WP, tgo < 1) --> decreasing speed
+        derr_Ri              = 0. - QR_Vi
+        Vqi_cmd              = Kp_pos * err_Ri
+        dVqi_cmd             = Kp_pos * derr_Ri
         # velocity control
-        err_Vi      =   Vqi_cmd - QR_Vi
-        derr_Vi     =   dVqi_cmd - QR_Ai
-        Aqi_cmd     =   QR_Kp_vel * err_Vi + QR_Kd_vel * derr_Vi
+        err_Vi               = Vqi_cmd - QR_Vi
+        derr_Vi              = dVqi_cmd - QR_Ai
+        Aqi_cmd              = QR_Kp_vel * err_Vi + QR_Kd_vel * derr_Vi
     elif QR_Guid_type == 1 or QR_Guid_type == 3:
         if QR_Guid_type == 3:
             QR_desired_speed = MPPI_ctrl_input[1]
-            QR_guid_eta = MPPI_ctrl_input[2]
+            QR_guid_eta      = MPPI_ctrl_input[2]
         # calc. variables
-        QR_mag_Vi = np.linalg.norm(QR_Vi)
-        FPA_azim, FPA_elev   =   azim_elev_from_vec3(QR_Vi)
-        QR_cI_W =   DCM_from_euler_angle(np.array([0., FPA_elev, FPA_azim]))
+        QR_mag_Vi            = np.linalg.norm(QR_Vi)
+        FPA_azim, FPA_elev   = azim_elev_from_vec3(QR_Vi)
+        QR_cI_W              = DCM_from_euler_angle(np.array([0., FPA_elev, FPA_azim]))
         #.. guidance - GL - parameters by MPPI
-        Aqw_cmd     =   np.zeros(3)
+        Aqw_cmd              = np.zeros(3)
         # a_x command
-        err_mag_V   =   QR_desired_speed - QR_mag_Vi
-        dQR_mag_Vi    =   np.dot(QR_Vi, QR_Ai) / max(QR_mag_Vi, 0.1)
-        derr_mag_V  =   0. - dQR_mag_Vi
-        Aqw_cmd[0]  =   QR_Kp_speed * err_mag_V + QR_Kd_speed * derr_mag_V
+        err_mag_V            = QR_desired_speed - QR_mag_Vi
+        dQR_mag_Vi           = np.dot(QR_Vi, QR_Ai) / max(QR_mag_Vi, 0.1)
+        derr_mag_V           = 0. - dQR_mag_Vi
+        Aqw_cmd[0]           = QR_Kp_speed * err_mag_V + QR_Kd_speed * derr_mag_V
         # pursuit guidance law
-        Rqti        =   VT_Ri - QR_Ri
-        Rqtw        =   np.matmul(QR_cI_W,Rqti)
-        err_azim, err_elev    =   azim_elev_from_vec3(Rqtw)
-        Aqw_cmd[1]  =   QR_guid_eta* 3. / 1.5 * err_azim
-        Aqw_cmd[2]  =   -QR_guid_eta* 3. / 1.5 * err_elev
+        Rqti                 = VT_Ri - QR_Ri
+        Rqtw                 = np.matmul(QR_cI_W,Rqti)
+        err_azim, err_elev   = azim_elev_from_vec3(Rqtw)
+        Aqw_cmd[1]           = QR_guid_eta* 3. / 1.5 * err_azim
+        Aqw_cmd[2]           = -QR_guid_eta* 3. / 1.5 * err_elev
         # command coordinate change
-        cW_I        =   np.transpose(QR_cI_W)
-        Aqi_cmd     =   np.matmul(cW_I, Aqw_cmd)
+        cW_I                 = np.transpose(QR_cI_W)
+        Aqi_cmd              = np.matmul(cW_I, Aqw_cmd)
     elif QR_Guid_type == 2:
-        Aqi_cmd     =   MPPI_ctrl_input
-    return Aqi_cmd
+        Aqi_cmd              = MPPI_ctrl_input
+    return Aqi_cmd, MPPI_ctrl_input[1]
 
 
 #.. convert_Ai_cmd_to_thrust_and_att_ang_cmd
 def convert_Ai_cmd_to_thrust_and_att_ang_cmd(Ai_cmd, mass, T_max, WP_WPs, WP_idx_heading, Ri, att_ang, del_psi_cmd_limit):    
     # thrust cmd
     norm_Ai_cmd = np.linalg.norm(Ai_cmd)
-    T_cmd = min(norm_Ai_cmd * mass, T_max)
-    mag_Ai_cmd = T_cmd / mass
-    Ai_cmd =  Ai_cmd / norm_Ai_cmd * mag_Ai_cmd
-    norm_T_cmd = T_cmd / T_max
+    T_cmd       = min(norm_Ai_cmd * mass, T_max)
+    mag_Ai_cmd  = T_cmd / mass
+    Ai_cmd      = Ai_cmd / norm_Ai_cmd * mag_Ai_cmd
+    norm_T_cmd  = T_cmd / T_max
 
     # attitude angle cmd
     WP_heading  =   WP_WPs[WP_idx_heading]
@@ -95,8 +96,7 @@ def convert_Ai_cmd_to_thrust_and_att_ang_cmd(Ai_cmd, mass, T_max, WP_WPs, WP_idx
         WP_passed   =   WP_WPs[WP_idx_passed]
         WP12        =   WP_heading - WP_passed
         psi_des, _  =   azim_elev_from_vec3(WP12)
-    # psi_des     =   0.
-    
+        
     # att_ang_cmd -  del_psi_cmd limitation
     del_psi     =   psi_des - att_ang[2]
     if abs(del_psi) > 1.0*m.pi:
@@ -131,7 +131,7 @@ def NDO_for_Ai_cmd(T_cmd, mass, grav, QR_cI_B, QR_gain_NDO, QR_z_NDO, QR_Vi, QR_
     dz_NDO[1]   =   -QR_gain_NDO[1]*QR_z_NDO[1] - QR_gain_NDO[1] * (QR_gain_NDO[1]*QR_Vi[1] + Ai_thrust[1] + Ai_rotor_drag[1])
     dz_NDO[2]   =   -QR_gain_NDO[2]*QR_z_NDO[2] - QR_gain_NDO[2] * (QR_gain_NDO[2]*QR_Vi[2] + Ai_thrust[2] + Ai_rotor_drag[2] + grav)
     
-    QR_out_NDO  =   np.zeros(3)
+    QR_out_NDO     =   np.zeros(3)
     QR_out_NDO[0]  =   QR_z_NDO[0] + QR_gain_NDO[0]*QR_Vi[0]
     QR_out_NDO[1]  =   QR_z_NDO[1] + QR_gain_NDO[1]*QR_Vi[1]
     QR_out_NDO[2]  =   QR_z_NDO[2] + QR_gain_NDO[2]*QR_Vi[2]
@@ -143,11 +143,11 @@ def NDO_for_Ai_cmd(T_cmd, mass, grav, QR_cI_B, QR_gain_NDO, QR_z_NDO, QR_Vi, QR_
 def simple_rotor_drag_model(QR_Vi, psuedo_rotor_drag_coeff, cI_B):
     #.. drag model (ref: The True Role of Accelerometer Feedback in Quadrotor Control)
     #.. assumption: motor_rot_vel = hovering_motor_rot_vel --> set psuedo_rotor_drag_coeff
-    cB_I = np.transpose(cI_B)
-    joint_axis_b = np.array([0., 0., -1.])
-    joint_axis_i = np.matmul(cB_I, joint_axis_b)
-    velocity_parallel_to_rotor_axis = np.dot(QR_Vi, joint_axis_i) * joint_axis_i
+    cB_I                                 = np.transpose(cI_B)
+    joint_axis_b                         = np.array([0., 0., -1.])
+    joint_axis_i                         = np.matmul(cB_I, joint_axis_b)
+    velocity_parallel_to_rotor_axis      = np.dot(QR_Vi, joint_axis_i) * joint_axis_i
     velocity_perpendicular_to_rotor_axis = QR_Vi - velocity_parallel_to_rotor_axis 
-    Fi_drag = - psuedo_rotor_drag_coeff * velocity_perpendicular_to_rotor_axis
+    Fi_drag                              = -psuedo_rotor_drag_coeff * velocity_perpendicular_to_rotor_axis
     
     return Fi_drag

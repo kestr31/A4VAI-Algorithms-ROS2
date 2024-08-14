@@ -17,20 +17,20 @@ import math as m
 
 #.. distance_to_path
 def distance_to_path(WP_WPs, QR_WP_idx_heading, QR_Ri, QR_point_closest_on_path_i, QR_WP_idx_passed):
-    dist_to_path        =   999999.
+    dist_to_path            =   999999.
     for i_WP in range(QR_WP_idx_heading,0,-1):
-        Rw1w2       =   WP_WPs[i_WP] - WP_WPs[i_WP-1]
-        mag_Rw1w2   =   np.linalg.norm(Rw1w2)
-        Rw1q        =   QR_Ri - WP_WPs[i_WP-1]
-        mag_w1p     =   min(max(np.dot(Rw1w2, Rw1q)/max(mag_Rw1w2,0.001), 0.), mag_Rw1w2)
+        Rw1w2               =   WP_WPs[i_WP] - WP_WPs[i_WP-1]
+        mag_Rw1w2           =   np.linalg.norm(Rw1w2)
+        Rw1q                =   QR_Ri - WP_WPs[i_WP-1]
+        mag_w1p             =   min(max(np.dot(Rw1w2, Rw1q)/max(mag_Rw1w2,0.001), 0.), mag_Rw1w2)
         p_closest_on_path   =   WP_WPs[i_WP-1] + mag_w1p * Rw1w2/max(mag_Rw1w2,0.001)
-        mag_Rqp     =   np.linalg.norm(p_closest_on_path - QR_Ri)
+        mag_Rqp             =   np.linalg.norm(p_closest_on_path - QR_Ri)
         if dist_to_path < mag_Rqp:
             break
         else:
-            dist_to_path    =   mag_Rqp
+            dist_to_path                  =   mag_Rqp
             QR_point_closest_on_path_i    =   p_closest_on_path
-            QR_WP_idx_passed        =   max(i_WP-1, 0)
+            QR_WP_idx_passed              =   max(i_WP-1, 0)
             pass
         pass
     return dist_to_path, QR_point_closest_on_path_i, QR_WP_idx_passed

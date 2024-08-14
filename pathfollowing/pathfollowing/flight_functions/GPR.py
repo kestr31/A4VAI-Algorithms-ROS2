@@ -180,7 +180,7 @@ class GPR_Modules():
         me_z = self.GP_param.m_z_GPR
         Pe_z = self.GP_param.P_z_GPR 
 
-        for i in range(self.GP_param.ne_GPR):
+        for i in range(self.GP_param.ne_GPR*2):
             me_x = self.GP_param.A_x_GPR.dot(me_x)
             Pe_x = (self.GP_param.A_x_GPR.dot(Pe_x)).dot(self.GP_param.A_x_GPR.T) + self.GP_param.Q_x_GPR
             me_y = self.GP_param.A_y_GPR.dot(me_y)
@@ -190,12 +190,14 @@ class GPR_Modules():
 
             te = te + self.GP_param.dt_GPR
 
-            self.GP_param.te_array[i]    = te
-            self.GP_param.me_x_array[i]  = me_x[0]
-            self.GP_param.var_x_array[i] = Pe_x[0][0]
-            self.GP_param.me_y_array[i]  = me_y[0]
-            self.GP_param.var_y_array[i] = Pe_y[0][0]
-            self.GP_param.me_z_array[i]  = me_z[0]
-            self.GP_param.var_z_array[i] = Pe_z[0][0]
+            if (i % 2 == 0):
+                i_save = int(i*0.5)
+                self.GP_param.te_array[i_save]    = te
+                self.GP_param.me_x_array[i_save]  = me_x[0]
+                self.GP_param.var_x_array[i_save] = Pe_x[0][0]
+                self.GP_param.me_y_array[i_save]  = me_y[0]
+                self.GP_param.var_y_array[i_save] = Pe_y[0][0]
+                self.GP_param.me_z_array[i_save]  = me_z[0]
+                self.GP_param.var_z_array[i_save] = Pe_z[0][0]
         
         pass

@@ -53,6 +53,15 @@ class Quadrotor_6DOF():
 
         pass
 
+    #.. WP_manual
+    def WP_manual_set(self, WP_WPs):
+        
+        WP_WPs[self.PF_var.WP_idx_heading]   =  WP_WPs[self.PF_var.WP_idx_heading + 1]
+        WP_WPs[self.PF_var.WP_idx_passed+1]  =  self.PF_var.VT_Ri
+        self.PF_var.WP_manual = 0
+        
+        return WP_WPs
+
     #.. PF_required_info 
     def PF_required_info(self, WP_WPs, t_sim, dt):
         self.PF_var.dist_to_path, self.PF_var.point_closest_on_path_i, self.PF_var.WP_idx_passed = path_following_required_info.distance_to_path(
@@ -102,7 +111,7 @@ class Quadrotor_6DOF():
         
     #.. guid_Ai_cmd
     def guid_Ai_cmd(self, WP_WPs_shape0, MPPI_ctrl_input):
-        self.guid_var.Ai_cmd = guidance_path_following.guidance_modules(
+        self.guid_var.Ai_cmd, self.GnC_param.desired_speed_test = guidance_path_following.guidance_modules(
             self.GnC_param.Guid_type, self.PF_var.WP_idx_passed, self.PF_var.WP_idx_heading, WP_WPs_shape0,
             self.PF_var.VT_Ri, self.state_var.Ri, self.state_var.Vi, self.state_var.Ai, self.GnC_param.desired_speed,
             self.GnC_param.Kp_vel, self.GnC_param.Kd_vel, self.GnC_param.Kp_speed, self.GnC_param.Kd_speed, self.GnC_param.guid_eta,

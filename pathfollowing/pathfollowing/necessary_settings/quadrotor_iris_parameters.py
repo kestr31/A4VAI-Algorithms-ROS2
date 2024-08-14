@@ -28,7 +28,7 @@ class MPPI_Parameter():
         
         # cost-related
         # self.Q      =   np.array([4.0, 0.])     # dist, V
-        self.Q      =   np.array([8.0, 0.])     # dist, V
+        self.Q      =   np.array([10.0, 0.0])     # dist, V
         # self.R      =   np.array([0.004])
         self.R      =   np.array([0.001])
         # self.P      =   np.array([40.0])
@@ -43,36 +43,22 @@ class MPPI_Parameter():
             self.flag_cost_calc     =   0
             #.. Parameters - low performance && short computation
             self.dt_MPPI     =   0.05
-            self.K      =   256
-            self.N      =   70
-            self.nu     =   1000. 
+            self.K           =   256 
+            self.N           =   70
             #.. u1: VTD, u2: desired_speed, u3: guid_eta
-            self.var1   =   0.
-            self.var2   =   1.0 * 1.0
-            self.var3   =   1.0 * 1.0
-            self.lamb1  =   1.0 * 4.0
-            self.lamb2  =   1.0 * 0.5
-            self.lamb3  =   1.0 * 0.5
-            self.u1_init    =   4. # 3.
-            self.u2_init    =   1.
-            self.u3_init    =   0.
+            
+            self.var2       =   1.0 * 0.5
+            self.var3       =   1.0 * 0.5 
+            self.lamb2      =   1.0 * 1.0
+            self.lamb3      =   1.0 * 1.0 
+            # self.lamb2      =   self.R[0]*self.var2*self.var2
+            # self.lamb3      =   self.R[0]*self.var3*self.var3
 
-            # #.. Parameters - good / stable for 6dof
-            # self.dt_MPPI     =   0.04
-            # self.N      =   100
-            # self.nu     =   1000.
-            # # #.. u1: LAD, u2: desired_speed, u3: eta
-            # self.var1   =   1.0 * 0.5           # 0.2
-            # self.var2   =   self.var1
-            # self.var3   =   self.var1
-            # self.lamb1  =   1.0 *1.0           # 1.0
-            # self.lamb2  =   self.lamb1
-            # self.lamb3  =   self.lamb1
-            # self.u1_init    =   3.0
-            # self.u2_init    =   2.0
-            # self.u3_init    =   2.
+            # self.var2       =   np.sqrt(self.lamb2/self.R[0])
             
-            
+            self.u2_init    =   3.
+            self.u3_init    =   2.
+                     
             
         elif self.MPPI_type == 2:
             # # cost-related
@@ -159,8 +145,9 @@ class GPR_Parameter():
 
     #.. >>>>>  set_values  <<<<<
     def set_values(self, dt_GPR, ne_GPR):
-        self.dt_GPR     =   dt_GPR
-        self.dt_GPR_opt =   dt_GPR * 15
+        self.dt_GPR       =  dt_GPR
+        self.dt_GPR_opt   =  dt_GPR * 20
+        self.update_flag  =  0
 
         #.. gaussian process regression parameter
         self.ne_GPR     =   ne_GPR    # forecasting number (ne = 2000, te = 2[sec])
@@ -224,12 +211,13 @@ class GnC_Parameter():
     #.. >>>>>  set_values  <<<<<
     def set_values(self, Guid_type):
         #.. PF guidance
-        self.dt_GCU     =   0.004
-        self.Guid_type  =   Guid_type       # | 0: Ctrl-based | 1: GL-based | 2: Direct | 3: GL-based-MPPI | 4: Ctrl-based MPPI | 9: test
-        self.desired_speed      =   3.
-        self.virtual_target_distance     =   4.5
-        self.distance_change_WP    =   self.virtual_target_distance
-        self.dist_change_first_WP = 0.3
+        self.dt_GCU                    =   0.004
+        self.Guid_type                 =   Guid_type       # | 0: Ctrl-based | 1: GL-based | 2: Direct | 3: GL-based-MPPI | 4: Ctrl-based MPPI | 9: test
+        self.desired_speed             =   3.
+        self.desired_speed_test        =   0.
+        self.virtual_target_distance   =   4.5
+        self.distance_change_WP        =   self.virtual_target_distance
+        self.dist_change_first_WP      =   0.3
         
         #.. param. of Guid_tpye = 0
         self.Kp_vel     =   1.
@@ -244,21 +232,16 @@ class GnC_Parameter():
         self.gain_NDO   =   1.0 * np.array([1.0,1.0,1.0])
 
         #.. attitude control parameter
-        self.tau_phi    =   0.3
+        self.tau_phi    =   0.6
         self.tau_the    =   self.tau_phi
         self.tau_psi    =   self.tau_phi * 2.
         self.del_psi_cmd_limit = 15. * m.pi/180.
-        
-        # self.del_psi_cmd_limit = 0. * m.pi/180.
-        # self.del_psi_cmd_limit = 10. * m.pi/180.
-        # self.del_psi_cmd_limit = 20. * m.pi/180.
-        # self.del_psi_cmd_limit = 30. * m.pi/180.
-        
+                
         self.tau_Wb     =   0.05 # in [https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/154099/eth-7387-01.pdf]
 
-        self.tau_p      =   0.1
-        self.tau_q      =   0.1
-        self.tau_r      =   0.2
+        self.tau_p      =   0.2
+        self.tau_q      =   0.2
+        self.tau_r      =   0.4
 
         self.alpha_p    =   0.1  
         self.alpha_q    =   0.1   
@@ -287,17 +270,16 @@ class Physical_Parameter():
     #.. >>>>>  set_values  <<<<<
     def set_values(self):
         # PX4 specs (iris) in [1]
-        timeConstantUp          =   0.0125
-        timeConstantDown        =   0.025
-        maxRotVelocity          =   1100
-        maxRotVelocity_limitied =   956.5   # max 2200 but actual 2000 in [8]
-        motorConstant           =   5.84e-06
-        momentConstant          =   0.06
-        rotorDragCoefficient    =   0.000175
-        rollingMomentCoefficient    =   1e-06
-        
-        d                   =   0.4
-        g                   =   9.81
+        timeConstantUp              =   0.0125
+        timeConstantDown            =   0.025
+        maxRotVelocity              =   1100
+        maxRotVelocity_limitied     =   956.5   # max 2200 but actual 2000 in [8]
+        motorConstant               =   5.84e-06
+        momentConstant              =   0.06
+        rotorDragCoefficient        =   0.000175
+        rollingMomentCoefficient    =   1e-06        
+        d                           =   0.4
+        g                           =   9.81
         
         #.. physical model: iris in [1]
         self.Ixx            =   0.029125     
@@ -313,31 +295,24 @@ class Physical_Parameter():
         self.Lz_M           =   0.023
 
         # hover throtle level
-        self.n_Motor        =   4
-        self.T_hover        =   self.mass * g
-        # self.throttle_hover =   0.73       # experiment in PX4_sitl
-        # self.T_max          =   self.T_hover / self.throttle_hover**2
-        # self.T_max_M        =   self.T_max / self.n_Motor
-        # self.motorConstant  =   motorConstant
-        # self.momentConstant =   momentConstant
-        # self.maxRotVel      =   m.sqrt(self.T_max_M / self.motorConstant)
-        
-        self.motorConstant  =   motorConstant
-        self.momentConstant =   momentConstant
-        self.maxRotVel      =   maxRotVelocity
-        self.T_max_M        =   self.motorConstant * self.maxRotVel**2
-        self.T_max          =   self.T_max_M * self.n_Motor
-        self.throttle_hover =   m.sqrt(self.T_hover / self.T_max)
-        self.rotor_turning_direction = np.array([-1., 1., -1., 1]) # CW(1) and CCW(-1) w.r.t. rotor axis(-z_B)
+        self.n_Motor                    =   4
+        self.T_hover                    =   self.mass * g      
+        self.motorConstant              =   motorConstant
+        self.momentConstant             =   momentConstant
+        self.maxRotVel                  =   maxRotVelocity
+        self.T_max_M                    =   self.motorConstant * self.maxRotVel**2
+        self.T_max                      =   self.T_max_M * self.n_Motor
+        self.throttle_hover             =   m.sqrt(self.T_hover / self.T_max)
+        self.rotor_turning_direction    =   np.array([-1., 1., -1., 1]) # CW(1) and CCW(-1) w.r.t. rotor axis(-z_B)
         
         # motor coefficient
-        self.Kq_Motor       =   self.motorConstant/self.T_max_M
-        self.Kt_Motor       =   self.Kq_Motor / self.momentConstant
-        self.rotorDragCoefficient   =   rotorDragCoefficient
+        self.Kq_Motor                   =   self.motorConstant/self.T_max_M
+        self.Kt_Motor                   =   self.Kq_Motor / self.momentConstant
+        self.rotorDragCoefficient       =   rotorDragCoefficient
         self.rollingMomentCoefficient   =   rollingMomentCoefficient
         
         # simple - psuedo rotor drag coeff.        
-        simple_motor_rot_vel_sum  =   4 * self.maxRotVel * self.throttle_hover
+        simple_motor_rot_vel_sum     = 4 * self.maxRotVel * self.throttle_hover
         self.psuedo_rotor_drag_coeff = simple_motor_rot_vel_sum * self.rotorDragCoefficient
         
         # collocation matrix

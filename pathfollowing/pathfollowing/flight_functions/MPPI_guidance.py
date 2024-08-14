@@ -30,7 +30,6 @@ class MPPI_Guidance_Modules():
     #.. initialize an instance of the class
     def __init__(self, MPPI_Param:MPPI_Parameter) -> None:
         self.MP     =   MPPI_Param
-        self.u1     =   self.MP.u1_init * np.ones(self.MP.N)
         self.u2     =   self.MP.u2_init * np.ones(self.MP.N)
         self.u3     =   self.MP.u3_init * np.ones(self.MP.N)
         self.Ai_est_dstb    =   np.zeros((self.MP.N,3))
@@ -42,81 +41,53 @@ class MPPI_Guidance_Modules():
         
         #.. variable setting - MPPI Monte Carlo simulation
         # set CPU variables
-        arr_u1          =   np.array(self.u1).astype(np.float64)
         arr_u2          =   np.array(self.u2).astype(np.float64)
         arr_u3          =   np.array(self.u3).astype(np.float64)
-        arr_delta_u1    =   self.MP.var1*np.random.randn(self.MP.N,self.MP.K).astype(np.float64)
         arr_delta_u2    =   self.MP.var2*np.random.randn(self.MP.N,self.MP.K).astype(np.float64)
         arr_delta_u3    =   self.MP.var3*np.random.randn(self.MP.N,self.MP.K).astype(np.float64)
         arr_stk         =   np.zeros(self.MP.K).astype(np.float64)
-        # res_length      =   self.MP.N
-        # res_var_num     =   16
-        res_length      =   1
-        res_var_num     =   1
-        arr_res1        =   np.zeros((res_length, res_var_num)).astype(np.float64)
-        arr_int_MP      =   np.array([self.MP.K, self.MP.N, self.MP.flag_cost_calc, res_var_num]).astype(np.int32)
-        arr_dbl_MP      =   np.array([self.MP.dt_MPPI, self.MP.nu, 
-                                      self.MP.R[0], self.MP.Q[0], self.MP.Q[1], self.MP.P[0],
-                                      self.MP.u1_init, self.MP.u2_init, self.MP.u3_init, 
-                                      self.MP.cost_min_V_aligned]).astype(np.float64)
+        
+        arr_int_MP      =   np.array([self.MP.K, self.MP.N]).astype(np.int32)
+        arr_dbl_MP      =   np.array([self.MP.dt_MPPI, self.MP.R[0], self.MP.Q[0], self.MP.Q[1], self.MP.P[0],
+                                      QR.GnC_param.virtual_target_distance, self.MP.cost_min_V_aligned]).astype(np.float64)
         arr_int_QR      =   np.array([QR.PF_var.WP_idx_heading, QR.PF_var.WP_idx_passed, QR.GnC_param.Guid_type]).astype(np.int32)
         arr_dbl_QR      =   np.array([QR.state_var.Ri[0], QR.state_var.Ri[1], QR.state_var.Ri[2], 
                                       QR.state_var.Vi[0], QR.state_var.Vi[1], QR.state_var.Vi[2],
                                       QR.state_var.att_ang[0], QR.state_var.att_ang[1], QR.state_var.att_ang[2], 
-                                      QR.physical_param.throttle_hover, QR.physical_param.mass, 
-                                      QR.GnC_param.desired_speed, QR.GnC_param.virtual_target_distance, 
-                                      QR.GnC_param.distance_change_WP, QR.GnC_param.dist_change_first_WP,
-                                      QR.GnC_param.Kp_vel, QR.GnC_param.Kd_vel, QR.GnC_param.Kp_speed, QR.GnC_param.Kd_speed, QR.GnC_param.guid_eta, 
-                                      QR.GnC_param.tau_phi, QR.GnC_param.tau_the, QR.GnC_param.tau_psi, 
-                                      QR.GnC_param.tau_p, QR.GnC_param.tau_q, QR.GnC_param.tau_r,
-                                      QR.GnC_param.alpha_p, QR.GnC_param.alpha_q, QR.GnC_param.alpha_r,
-                                      QR.guid_var.T_cmd, QR.physical_param.psuedo_rotor_drag_coeff, QR.GnC_param.del_psi_cmd_limit,
-                                      QR.GnC_param.tau_Wb
-                                      ]).astype(np.float64)
-        # print(arr_dbl_QR)
-        arr_dbl_WPs     =   np.ravel(WPs,order='C').astype(np.float64)
-        arr_dbl_VT      =   np.array([QR.PF_var.VT_Ri[0], QR.PF_var.VT_Ri[1], QR.PF_var.VT_Ri[2]]).astype(np.float64)
-        arr_Ai_est_dstb =   np.array(self.Ai_est_dstb).astype(np.float64)
-        arr_ent_param_float =   np.array([self.MP.lamb1, self.MP.lamb2, self.MP.lamb3]).astype(np.float64)
-        arr_numer1  =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
-        arr_numer2  =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
-        arr_numer3  =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
-        arr_denom1  =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
-        arr_denom2  =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
-        arr_denom3  =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
+                                      QR.guid_var.T_cmd]).astype(np.float64)
+        arr_dbl_WPs         =   np.ravel(WPs,order='C').astype(np.float64)
+        arr_dbl_VT          =   np.array([QR.PF_var.VT_Ri[0], QR.PF_var.VT_Ri[1], QR.PF_var.VT_Ri[2]]).astype(np.float64)
+        arr_Ai_est_dstb     =   np.array(self.Ai_est_dstb).astype(np.float64)
+        arr_ent_param_float =   np.array([self.MP.lamb2, self.MP.lamb3]).astype(np.float64)
+        arr_numer2          =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
+        arr_numer3          =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
+        arr_denom2          =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
+        arr_denom3          =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
         # arr_ent_param_float =   np.array([self.MP.lamb1, self.MP.lamb2, self.MP.lamb3]).astype(np.float64)
         # occupy GPU memory space
-        gpu_u1          =   cuda.mem_alloc(arr_u1.nbytes)
-        gpu_u2          =   cuda.mem_alloc(arr_u2.nbytes)
-        gpu_u3          =   cuda.mem_alloc(arr_u3.nbytes)
-        gpu_delta_u1    =   cuda.mem_alloc(arr_delta_u1.nbytes)
-        gpu_delta_u2    =   cuda.mem_alloc(arr_delta_u2.nbytes)
-        gpu_delta_u3    =   cuda.mem_alloc(arr_delta_u3.nbytes)
-        gpu_stk         =   cuda.mem_alloc(arr_stk.nbytes)
-        gpu_res1        =   cuda.mem_alloc(arr_res1.nbytes)
-        gpu_int_MP      =   cuda.mem_alloc(arr_int_MP.nbytes)
-        gpu_dbl_MP      =   cuda.mem_alloc(arr_dbl_MP.nbytes)
-        gpu_int_QR      =   cuda.mem_alloc(arr_int_QR.nbytes)
-        gpu_dbl_QR      =   cuda.mem_alloc(arr_dbl_QR.nbytes)
-        gpu_dbl_WPs     =   cuda.mem_alloc(arr_dbl_WPs.nbytes)
-        gpu_dbl_VT      =   cuda.mem_alloc(arr_dbl_VT.nbytes)
-        gpu_Ai_est_dstb =   cuda.mem_alloc(arr_Ai_est_dstb.nbytes)
-        # gpu_ent_param_float =   cuda.mem_alloc(arr_ent_param_float.nbytes)
-        gpu_numer1  =   cuda.mem_alloc(arr_numer1.nbytes)
-        gpu_numer2  =   cuda.mem_alloc(arr_numer2.nbytes)
-        gpu_numer3  =   cuda.mem_alloc(arr_numer3.nbytes)
-        gpu_denom1  =   cuda.mem_alloc(arr_denom1.nbytes)
-        gpu_denom2  =   cuda.mem_alloc(arr_denom2.nbytes)
-        gpu_denom3  =   cuda.mem_alloc(arr_denom3.nbytes)
+        gpu_u2              =   cuda.mem_alloc(arr_u2.nbytes)
+        gpu_u3              =   cuda.mem_alloc(arr_u3.nbytes)
+        gpu_delta_u2        =   cuda.mem_alloc(arr_delta_u2.nbytes)
+        gpu_delta_u3        =   cuda.mem_alloc(arr_delta_u3.nbytes)
+        gpu_stk             =   cuda.mem_alloc(arr_stk.nbytes)
+        gpu_int_MP          =   cuda.mem_alloc(arr_int_MP.nbytes)
+        gpu_dbl_MP          =   cuda.mem_alloc(arr_dbl_MP.nbytes)
+        gpu_int_QR          =   cuda.mem_alloc(arr_int_QR.nbytes)
+        gpu_dbl_QR          =   cuda.mem_alloc(arr_dbl_QR.nbytes)
+        gpu_dbl_WPs         =   cuda.mem_alloc(arr_dbl_WPs.nbytes)
+        gpu_dbl_VT          =   cuda.mem_alloc(arr_dbl_VT.nbytes)
+        gpu_Ai_est_dstb     =   cuda.mem_alloc(arr_Ai_est_dstb.nbytes)
         gpu_ent_param_float =   cuda.mem_alloc(arr_ent_param_float.nbytes)
+        gpu_numer2          =   cuda.mem_alloc(arr_numer2.nbytes)
+        gpu_numer3          =   cuda.mem_alloc(arr_numer3.nbytes)
+        gpu_denom2          =   cuda.mem_alloc(arr_denom2.nbytes)
+        gpu_denom3          =   cuda.mem_alloc(arr_denom3.nbytes)
+
         # convert data memory from CPU to GPU
-        cuda.memcpy_htod(gpu_u1,arr_u1)
         cuda.memcpy_htod(gpu_u2,arr_u2)
         cuda.memcpy_htod(gpu_u3,arr_u3)
-        cuda.memcpy_htod(gpu_delta_u1,arr_delta_u1)
         cuda.memcpy_htod(gpu_delta_u2,arr_delta_u2)
         cuda.memcpy_htod(gpu_delta_u3,arr_delta_u3)
-        cuda.memcpy_htod(gpu_res1,arr_res1)
         cuda.memcpy_htod(gpu_stk,arr_stk)
         cuda.memcpy_htod(gpu_int_MP,arr_int_MP)
         cuda.memcpy_htod(gpu_dbl_MP,arr_dbl_MP)
@@ -125,22 +96,16 @@ class MPPI_Guidance_Modules():
         cuda.memcpy_htod(gpu_dbl_WPs,arr_dbl_WPs)
         cuda.memcpy_htod(gpu_dbl_VT,arr_dbl_VT)
         cuda.memcpy_htod(gpu_Ai_est_dstb,arr_Ai_est_dstb)
-        # cuda.memcpy_htod(gpu_ent_param_float, arr_ent_param_float)
-        cuda.memcpy_htod(gpu_numer1, arr_numer1)
+        cuda.memcpy_htod(gpu_ent_param_float, arr_ent_param_float)
         cuda.memcpy_htod(gpu_numer2, arr_numer2)
         cuda.memcpy_htod(gpu_numer3, arr_numer3)
-        cuda.memcpy_htod(gpu_denom1, arr_denom1)
         cuda.memcpy_htod(gpu_denom2, arr_denom2)
         cuda.memcpy_htod(gpu_denom3, arr_denom3)
-        cuda.memcpy_htod(gpu_ent_param_float, arr_ent_param_float)
         
         #.. run MPPI Monte Carlo simulation code script
-        # cuda code script function handler
-        # func_MC     =   SourceModule(self.total_MPPI_code).get_function("MPPI_monte_carlo_sim")
         # run cuda script by using GPU cores
         unit_gpu_allocation = 32        # GPU SP number
         # unit_gpu_allocation = 64        # GPU SP number
-        # unit_gpu_allocation = 128        # GPU SP number
         blocksz     =   (unit_gpu_allocation, 1, 1)
         gridsz      =   (round(self.MP.K/(unit_gpu_allocation)), 1)
         # gridsz      =   (round(int(np.ceil(256 / unit_gpu_allocation))), 1)
@@ -148,96 +113,53 @@ class MPPI_Guidance_Modules():
         # gridsz      =   (1, 1)
         
         t1 = time.time()
-        self.func_MC(gpu_u1, gpu_u2, gpu_u3, 
-                gpu_delta_u1, gpu_delta_u2, gpu_delta_u3, gpu_stk, 
-                gpu_res1,
+        self.func_MC(gpu_u2, gpu_u3, 
+                gpu_delta_u2, gpu_delta_u3, gpu_stk,
                 gpu_int_MP, gpu_dbl_MP, gpu_int_QR, gpu_dbl_QR, 
                 gpu_dbl_WPs, gpu_dbl_VT,gpu_Ai_est_dstb, 
-                gpu_numer1,gpu_numer2,gpu_numer3,gpu_denom1,gpu_denom2,gpu_denom3,
+                gpu_numer2,gpu_numer3,gpu_denom2,gpu_denom3,
                 gpu_ent_param_float,
                 block=blocksz, grid=gridsz)
         t2 = time.time()
 
         #.. variable setting - MPPI entropy calculation
         # entropy calc. results
-        res_numer1     =   np.empty_like(arr_numer1)
         res_numer2     =   np.empty_like(arr_numer2)
         res_numer3     =   np.empty_like(arr_numer3)
-        res_denom1     =   np.empty_like(arr_denom1)
         res_denom2     =   np.empty_like(arr_denom2)
         res_denom3     =   np.empty_like(arr_denom3)
-        cuda.memcpy_dtoh(res_numer1, gpu_numer1)
         cuda.memcpy_dtoh(res_numer2, gpu_numer2)
         cuda.memcpy_dtoh(res_numer3, gpu_numer3)
-        cuda.memcpy_dtoh(res_denom1, gpu_denom1)
         cuda.memcpy_dtoh(res_denom2, gpu_denom2)
         cuda.memcpy_dtoh(res_denom3, gpu_denom3)
         
         #.. MPPI input calculation
         # entropy
-        sum_numer1      =   res_numer1.sum(axis=1)
         sum_numer2      =   res_numer2.sum(axis=1)
         sum_numer3      =   res_numer3.sum(axis=1)
-        sum_denom1      =   res_denom1.sum(axis=1)
         sum_denom2      =   res_denom2.sum(axis=1)
         sum_denom3      =   res_denom3.sum(axis=1)
-        denom_min       =   np.zeros(np.size(sum_denom1)) + 1.0e-11
-        entropy1    =   sum_numer1/np.maximum(sum_denom1, denom_min)
+        denom_min       =   np.zeros(np.size(sum_denom2)) + 1.0e-11
         entropy2    =   sum_numer2/np.maximum(sum_denom2, denom_min)
         entropy3    =   sum_numer3/np.maximum(sum_denom3, denom_min)
+
         # MPPI input
-        self.u1     =   self.u1 + entropy1    
         self.u2     =   self.u2 + entropy2
         self.u3     =   self.u3 + entropy3
         
         # MPPI result and update
-        MPPI_ctrl_input    =   np.array([self.u1[0], self.u2[0], self.u3[0]])
+        MPPI_ctrl_input    =   np.array([QR.GnC_param.virtual_target_distance, self.u2[0], self.u3[0]])
         
-        self.u1[0:self.MP.N-1]  =   self.u1[1:self.MP.N]
         self.u2[0:self.MP.N-1]  =   self.u2[1:self.MP.N]
         self.u3[0:self.MP.N-1]  =   self.u3[1:self.MP.N]
-        self.u1[self.MP.N-1]    =   self.MP.u1_init
         self.u2[self.MP.N-1]    =   self.MP.u2_init
         self.u3[self.MP.N-1]    =   self.MP.u3_init
-
 
         t3 = time.time()      
         # MPPI_calc_time = (t2 - t1) 
         MPPI_calc_time = t3 - t0
 
         return MPPI_ctrl_input, MPPI_calc_time
-    
-    def set_MPPI_entropy_calc_code(self):
-        self.MPPI_entropy_calc_code = """
-        __global__ void MPPI_entropy(double* arr_numer1, double* arr_numer2, double* arr_numer3, \
-            double* arr_denom1, double* arr_denom2, double* arr_denom3, double *arr_ent_param_float, \
-            double* arr_tmp1, double* arr_tmp2,\
-            double *arr_delta_u1, double *arr_delta_u2, double *arr_delta_u3, double *arr_stk)
-        {            
-            // parameters
-            double lamb1  =   arr_ent_param_float[0];
-            double lamb2  =   arr_ent_param_float[1];
-            double lamb3  =   arr_ent_param_float[2];
-
-            // index variables  
-            int k       =   threadIdx.x + threadIdx.y*blockDim.x + blockIdx.x*blockDim.x*blockDim.y;
-            int idx     =   threadIdx.x + threadIdx.y*blockDim.x + blockIdx.x*blockDim.x*blockDim.y + blockIdx.y*blockDim.x*blockDim.y*gridDim.x;
-
-            // calc num, den
-            arr_numer1[idx]     =   exp((-1/lamb1)*arr_stk[k])*arr_delta_u1[idx];
-            arr_denom1[idx]     =   exp((-1/lamb1)*arr_stk[k]);
-            arr_numer2[idx]     =   exp((-1/lamb2)*arr_stk[k])*arr_delta_u2[idx];
-            arr_denom2[idx]     =   exp((-1/lamb2)*arr_stk[k]);
-            arr_numer3[idx]     =   exp((-1/lamb3)*arr_stk[k])*arr_delta_u3[idx];
-            arr_denom3[idx]     =   exp((-1/lamb3)*arr_stk[k]);
-            arr_denom3[idx]     =   exp((-1/lamb3)*arr_stk[k]);
-            //arr_tmp1[idx] = arr_stk[k];
-            //arr_tmp2[idx] = (-1/lamb1)*arr_stk[k];
-        }
-        
-        """
-        self.func_Ent    =   SourceModule(self.MPPI_entropy_calc_code).get_function("MPPI_entropy")
-        pass
     
     def set_total_MPPI_code(self, num_WPs):
         self.total_MPPI_code = "#define nWP " + str(num_WPs) +  """
@@ -290,73 +212,71 @@ class MPPI_Guidance_Modules():
             double Ri[3], double Vb[3], double att_ang[3], double Wb[3], double cI_B[3][3], double cB_I[3][3], double Vi[3]);
         
         /*.. main function ..*/    
-        __global__ void MPPI_monte_carlo_sim(double* arr_u1, double* arr_u2, double* arr_u3, \
-            double* arr_delta_u1, double* arr_delta_u2, double* arr_delta_u3, double* arr_stk, \
-            double* arr_res1, \
+        __global__ void MPPI_monte_carlo_sim(double* arr_u2, double* arr_u3, \
+            double* arr_delta_u2, double* arr_delta_u3, double* arr_stk, \
             int* arr_int_MP, double* arr_dbl_MP, int* arr_int_QR, double* arr_dbl_QR, \
             double* arr_dbl_WPs, double* arr_dbl_VT, double* arr_Ai_est_dstb, \
-            double* arr_numer1, double* arr_numer2, double* arr_numer3, \
-            double* arr_denom1, double* arr_denom2, double* arr_denom3, double *arr_ent_param_float)
+            double* arr_numer2, double* arr_numer3, \
+            double* arr_denom2, double* arr_denom3, double *arr_ent_param_float)
         {
             //.. GPU core index for parallel computation
             int idx     =   threadIdx.x + threadIdx.y*blockDim.x + blockIdx.x*blockDim.x*blockDim.y + blockIdx.y*blockDim.x*blockDim.y*gridDim.x;
-            double m_pi =   acos(-1.);
+            
+            //--------------------------------------------------------------
+            // QUADROTOR MODEL PARAMETERS (PLEASE UPDATE WHEN CHANGES OCCUR)
+            //--------------------------------------------------------------
+            double physical_param_throttle_hover          = 0.7299;
+            double physical_param_mass                    = 1.535; 
+            double GnC_param_desired_speed                = 3.; 
+            double GnC_param_virtual_target_distance      = 4.5; 
+            double GnC_param_distance_change_WP           = GnC_param_virtual_target_distance; 
+            double GnC_param_dist_change_first_WP         = 0.3; 
+            double GnC_param_Kp_vel                       = 1.; 
+            double GnC_param_Kd_vel                       = 0.; 
+            double GnC_param_Kp_speed                     = 1.; 
+            double GnC_param_Kd_speed                     = 0.; 
+            double GnC_param_guid_eta                     = 3.; 
+            double GnC_param_tau_phi                      = 0.6; 
+            double GnC_param_tau_the                      = 0.6; 
+            double GnC_param_tau_psi                      = 0.9; 
+            double GnC_param_tau_p                        = 0.2; 
+            double GnC_param_tau_q                        = 0.2; 
+            double GnC_param_tau_r                        = 0.3; 
+            double GnC_param_alpha_p                      = 0.1; 
+            double GnC_param_alpha_q                      = 0.1; 
+            double GnC_param_alpha_r                      = 0.1; 
+            double physical_param_psuedo_rotor_drag_coeff = 0.5620; 
+            double GnC_param_del_psi_cmd_limit            = 0.349065850398866;
+            double GnC_param_tau_Wb                       = 0.05;
+            //--------------------------------------------------------------
 
             /*.. declare variables ..*/
             //.. set MPPI variables
-            int MP_K = arr_int_MP[0];
-            int MP_N = arr_int_MP[1];
-            int MP_flag_cost_calc = arr_int_MP[2];
-            int res_var_num = arr_int_MP[3];
-            double MP_dt = arr_dbl_MP[0];
-            double MP_nu = arr_dbl_MP[1]; 
-            double MP_R = arr_dbl_MP[2]; 
-            double MP_Q[2] = {arr_dbl_MP[3], arr_dbl_MP[4]};
-            double MP_P = arr_dbl_MP[5];
-            double MP_u1_init = arr_dbl_MP[6]; 
-            double MP_u2_init = arr_dbl_MP[7]; 
-            double MP_u3_init = arr_dbl_MP[8];
-            double MP_cost_min_V_aligned = arr_dbl_MP[9];
+            int    MP_K                   = arr_int_MP[0];
+            int    MP_N                   = arr_int_MP[1];
+            double MP_dt                  = arr_dbl_MP[0];
+            double MP_R                   = arr_dbl_MP[1]; 
+            double MP_Q[2]                = {arr_dbl_MP[2], arr_dbl_MP[3]};
+            double MP_P                   = arr_dbl_MP[4];
+            double virtual_target_distance= arr_dbl_MP[5];
+            double MP_cost_min_V_aligned  = arr_dbl_MP[6];
             
-            double times_N = 1.0;
-            double modif_dt = MP_dt / times_N;
+            double times_N                = 1.0;
+            double modif_dt               = MP_dt / times_N;
             
-            //.. set QR variables
-            int PF_var_WP_idx_heading = arr_int_QR[0];
-            int PF_var_WP_idx_passed = arr_int_QR[1];
-            int GnC_param_Guid_type = arr_int_QR[2];
-            
-            double state_var_Ri[3] = {arr_dbl_QR[0], arr_dbl_QR[1], arr_dbl_QR[2]};
-            double state_var_Vi[3] = {arr_dbl_QR[3], arr_dbl_QR[4], arr_dbl_QR[5]};
-            double state_var_att_ang[3] = {arr_dbl_QR[6], arr_dbl_QR[7], arr_dbl_QR[8]};
-            double state_var_Ai[3] = {0.,};
-            double state_var_Wb[3] = {0.,};
-            
-            double physical_param_throttle_hover= arr_dbl_QR[9]; 
-            double physical_param_mass = arr_dbl_QR[10]; 
-            double GnC_param_desired_speed= arr_dbl_QR[11]; 
-            double GnC_param_virtual_target_distance= arr_dbl_QR[12]; 
-            double GnC_param_distance_change_WP= arr_dbl_QR[13]; 
-            double GnC_param_dist_change_first_WP= arr_dbl_QR[14]; 
-            double GnC_param_Kp_vel= arr_dbl_QR[15]; 
-            double GnC_param_Kd_vel= arr_dbl_QR[16]; 
-            double GnC_param_Kp_speed= arr_dbl_QR[17]; 
-            double GnC_param_Kd_speed= arr_dbl_QR[18]; 
-            double GnC_param_guid_eta= arr_dbl_QR[19]; 
-            double GnC_param_tau_phi= arr_dbl_QR[20]; 
-            double GnC_param_tau_the= arr_dbl_QR[21]; 
-            double GnC_param_tau_psi= arr_dbl_QR[22]; 
-            double GnC_param_tau_p= arr_dbl_QR[23]; 
-            double GnC_param_tau_q= arr_dbl_QR[24]; 
-            double GnC_param_tau_r= arr_dbl_QR[25]; 
-            double GnC_param_alpha_p= arr_dbl_QR[26]; 
-            double GnC_param_alpha_q= arr_dbl_QR[27]; 
-            double GnC_param_alpha_r= arr_dbl_QR[28]; 
-            double guid_var_T_cmd = arr_dbl_QR[29]; 
-            double physical_param_psuedo_rotor_drag_coeff = arr_dbl_QR[30]; 
-            double GnC_param_del_psi_cmd_limit = arr_dbl_QR[31];
-            double GnC_param_tau_Wb = arr_dbl_QR[32];
+            //.. set PF variables
+            int PF_var_WP_idx_heading    = arr_int_QR[0];
+            int PF_var_WP_idx_passed     = arr_int_QR[1];
+            int GnC_param_Guid_type      = arr_int_QR[2];
                         
+            //.. set QR state variables
+            double state_var_Ri[3]       = {arr_dbl_QR[0], arr_dbl_QR[1], arr_dbl_QR[2]};
+            double state_var_Vi[3]       = {arr_dbl_QR[3], arr_dbl_QR[4], arr_dbl_QR[5]};
+            double state_var_att_ang[3]  = {arr_dbl_QR[6], arr_dbl_QR[7], arr_dbl_QR[8]};
+            double state_var_Ai[3]       = {0.,};
+            double state_var_Wb[3]       = {0.,};
+            double guid_var_T_cmd        = arr_dbl_QR[9];
+
             //.. set waypoints
             double WP_WPs[nWP][3]   =   {0.,};
             for(int i_WP = 0; i_WP < nWP; i_WP++){
@@ -366,49 +286,48 @@ class MPPI_Guidance_Modules():
             }
             
             //.. set others
-            double env_var_grav = 9.81;
-            double Ai_grav[3] = {0., 0., env_var_grav};
-            double physical_param_T_max = physical_param_mass * env_var_grav / physical_param_throttle_hover; 
-            double PF_var_point_closest_on_path_i[3] = {0.,};
-            double PF_var_dist_to_path = 0.;
-            double PF_var_VT_Ri[3] = {0.,};
-            double PF_var_cost_arr[3] = {0.,};
-            int PF_var_init_WP_idx_passed = 0;
-            int PF_var_final_WP_idx_passed = 0;
-            double PF_var_init_point_closest_on_path[3] = {0.,};
+            double env_var_grav                          = 9.81;
+            double Ai_grav[3]                            = {0., 0., env_var_grav};
+            double physical_param_T_max                  = physical_param_mass * env_var_grav / physical_param_throttle_hover; 
+            double PF_var_point_closest_on_path_i[3]     = {0.,};
+            double PF_var_dist_to_path                   = 0.;
+            double PF_var_VT_Ri[3]                       = {0.,};
+            double PF_var_cost_arr[3]                    = {0.,};
+            int PF_var_init_WP_idx_passed                = 0;
+            int PF_var_final_WP_idx_passed               = 0;
+            double PF_var_init_point_closest_on_path[3]  = {0.,};
             double PF_var_final_point_closest_on_path[3] = {0.,};
-            double PF_var_init_time = 0.;
-            double PF_var_final_time = MP_dt * MP_N;
-            double guid_var_Ai_cmd[3] = {0.,};
+            double PF_var_init_time                      = 0.;
+            double PF_var_final_time                     = MP_dt * MP_N;
+            double guid_var_Ai_cmd[3]                    = {0.,};
             double cI_B[3][3]; DCM_from_euler_angle(state_var_att_ang, cI_B);
             double cB_I[3][3]; transpose_(cI_B, cB_I);
             double Fi_drag[3] = {0.,};
-            double guid_var_Ai_rotor_drag[3] = {0.,};
-            double guid_var_Ai_disturbance[3] = {0.,};
+            double guid_var_Ai_rotor_drag[3]      = {0.,};
+            double guid_var_Ai_disturbance[3]     = {0.,};
             double guid_var_Ai_cmd_compensated[3] = {0.,};
-            double guid_var_att_ang_cmd[3] = {0.,};
+            double guid_var_att_ang_cmd[3]        = {0.,};
             
-            double state_var_Vb[3] = {0.,}; matmul_(cI_B, state_var_Vi, state_var_Vb);
-            double ctrl_var_err_Wb[3] = {0.,};
-            double ctrl_var_Wb_cmd[3] = {0.,};
+            double state_var_Vb[3]        = {0.,}; matmul_(cI_B, state_var_Vi, state_var_Vb);
+            double ctrl_var_err_Wb[3]     = {0.,};
+            double ctrl_var_Wb_cmd[3]     = {0.,};
             double ctrl_var_int_err_Wb[3] = {0.,};
-            double dyn_var_dot_Ri[3] = {0.,};
-            double dyn_var_dot_Vb[3] = {0.,};
+            double dyn_var_dot_Ri[3]      = {0.,};
+            double dyn_var_dot_Vb[3]      = {0.,};
             double dyn_var_dot_att_ang[3] = {0.,};
-            double dyn_var_dot_Wb[3] = {0.,};
+            double dyn_var_dot_Wb[3]      = {0.,};
             
             
             // set rate controller parameters
-            double zeta_Wb[3] = {0.,};
+            double zeta_Wb[3]  = {0.,};
             double omega_Wb[3] = {0.,};
-            zeta_Wb[0] = 0.5*sqrt(GnC_param_alpha_p/GnC_param_tau_p);
-            zeta_Wb[1] = 0.5*sqrt(GnC_param_alpha_q/GnC_param_tau_q);
-            zeta_Wb[2] = 0.5*sqrt(GnC_param_alpha_r/GnC_param_tau_r);
-            omega_Wb[0] = sqrt(1/(GnC_param_alpha_p*GnC_param_tau_p));
-            omega_Wb[1] = sqrt(1/(GnC_param_alpha_q*GnC_param_tau_q));
-            omega_Wb[2] = sqrt(1/(GnC_param_alpha_r*GnC_param_tau_r));
-            
-            
+            zeta_Wb[0]         = 0.5*sqrt(GnC_param_alpha_p/GnC_param_tau_p);
+            zeta_Wb[1]         = 0.5*sqrt(GnC_param_alpha_q/GnC_param_tau_q);
+            zeta_Wb[2]         = 0.5*sqrt(GnC_param_alpha_r/GnC_param_tau_r);
+            omega_Wb[0]        = sqrt(1/(GnC_param_alpha_p*GnC_param_tau_p));
+            omega_Wb[1]        = sqrt(1/(GnC_param_alpha_q*GnC_param_tau_q));
+            omega_Wb[2]        = sqrt(1/(GnC_param_alpha_r*GnC_param_tau_r));
+                        
             //.. main loop
             int i_N = 0;
             for(i_N = 0; i_N < MP_N; i_N++){
@@ -416,16 +335,16 @@ class MPPI_Guidance_Modules():
                 //.. MPPI modules - checked
                 double MPPI_ctrl_input[3] = {0.,};
                 if(GnC_param_Guid_type >= 2){
-                    MPPI_ctrl_input[0] = arr_u1[i_N] + arr_delta_u1[idx + MP_K*i_N];
+                    MPPI_ctrl_input[0] = virtual_target_distance;
                     MPPI_ctrl_input[1] = arr_u2[i_N] + arr_delta_u2[idx + MP_K*i_N];
                     MPPI_ctrl_input[2] = arr_u3[i_N] + arr_delta_u3[idx + MP_K*i_N];
                 }
                 
                 if (PF_var_WP_idx_heading == nWP-1){
-                    GnC_param_Guid_type = 1;
+                    GnC_param_Guid_type               = 1;
                     GnC_param_virtual_target_distance = 4;
-                    GnC_param_desired_speed = 2;
-                    GnC_param_guid_eta = 2;
+                    GnC_param_desired_speed           = 2;
+                    GnC_param_guid_eta                = 2;
                 }
                 
                 //.. Environment - checked
@@ -530,17 +449,13 @@ class MPPI_Guidance_Modules():
             
             //.. MPPI_entropy
             // parameters
-            double lamb1  =   arr_ent_param_float[0];
-            double lamb2  =   arr_ent_param_float[1];
-            double lamb3  =   arr_ent_param_float[2];
+            double lamb2  =   arr_ent_param_float[0];
+            double lamb3  =   arr_ent_param_float[1];
             i_N = 0;
             for(i_N = 0; i_N < MP_N; i_N++){
-                arr_numer1[idx + MP_K*i_N] = exp((-1/lamb1)*arr_stk[idx])*arr_delta_u1[idx + MP_K*i_N];
-                arr_denom1[idx + MP_K*i_N] = exp((-1/lamb1)*arr_stk[idx]);
-                arr_numer2[idx + MP_K*i_N] = exp((-1/lamb2)*arr_stk[idx])*arr_delta_u2[idx + MP_K*i_N];
+                arr_numer2[idx + MP_K*i_N] = exp(  (-1/lamb2)*arr_stk[idx]  )*arr_delta_u2[idx + MP_K*i_N];
                 arr_denom2[idx + MP_K*i_N] = exp((-1/lamb2)*arr_stk[idx]);
                 arr_numer3[idx + MP_K*i_N] = exp((-1/lamb3)*arr_stk[idx])*arr_delta_u3[idx + MP_K*i_N];
-                arr_denom3[idx + MP_K*i_N] = exp((-1/lamb3)*arr_stk[idx]);
                 arr_denom3[idx + MP_K*i_N] = exp((-1/lamb3)*arr_stk[idx]);
             }
         }
@@ -685,8 +600,8 @@ class MPPI_Guidance_Modules():
             
             // path following performance
             double x0 = dist_to_path;
-            //double x0Q0x0 = x0 * Q0 * x0;
-            double x0Q0x0 = x0 * Q0 * x0 * x0 * x0 * x0 * x0;
+            double x0Q0x0 = x0 * Q0 * x0;
+            //double x0Q0x0 = x0 * Q0 * x0 * x0 * x0 * x0 * x0;
             
             // energy consumption efficiency 
             //double V_aligned = max(dot_(unit_W1W2, Vi), min_V_aligned);
@@ -739,7 +654,7 @@ class MPPI_Guidance_Modules():
             // starting phase
             if (QR_WP_idx_passed < 1){
                 QR_Guid_type = 0;
-                QR_desired_speed = 0.5;
+                QR_desired_speed = 3.0;
             }
             // terminal phase
             if (QR_WP_idx_heading == (WP_WPs_shape0 - 1)){
@@ -928,7 +843,6 @@ class MPPI_Guidance_Modules():
                 Ab[i] = Ab_thrust[i] + Ab_aero[i] + Ab_grav[i];
             }
 
-            
             // Computing Dynamics 
             double Wb_X_Vb[3] = {0.,};
             cross_(Wb, Vb, Wb_X_Vb);

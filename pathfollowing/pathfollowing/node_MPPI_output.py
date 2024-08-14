@@ -27,7 +27,7 @@ class Node_MPPI_Output(Node):
         Iris_Param_Physical      = quadrotor_iris_parameters.Physical_Parameter()
         Iris_Param_GnC           = quadrotor_iris_parameters.GnC_Parameter(3)
         MPPI_Param               = quadrotor_iris_parameters.MPPI_Parameter(Iris_Param_GnC.Guid_type)
-        GPR_Param                = quadrotor_iris_parameters.GPR_Parameter(Iris_Param_GnC.dt_GCU, MPPI_Param.N)
+        GPR_Param                = quadrotor_iris_parameters.GPR_Parameter(MPPI_Param.dt_MPPI, MPPI_Param.N)
         self.QR                  = quadrotor.Quadrotor_6DOF(Iris_Param_Physical, Iris_Param_GnC, MPPI_Param, GPR_Param)
         self.WP                  = waypoint.Waypoint()
 
@@ -103,41 +103,6 @@ class Node_MPPI_Output(Node):
         self.QR.state_var.att_ang[1]                    =   msg.data[7]
         self.QR.state_var.att_ang[2]                    =   msg.data[8]
         self.QR.guid_var.T_cmd                          =   msg.data[9]
-
-        # self.QR.state_var.Ri[0]                         =   msg.data[0]
-        # self.QR.state_var.Ri[1]                         =   msg.data[1]
-        # self.QR.state_var.Ri[2]                         =   msg.data[2]
-        # self.QR.state_var.Vi[0]                         =   msg.data[3]
-        # self.QR.state_var.Vi[1]                         =   msg.data[4]
-        # self.QR.state_var.Vi[2]                         =   msg.data[5]
-        # self.QR.state_var.att_ang[0]                    =   msg.data[6]
-        # self.QR.state_var.att_ang[1]                    =   msg.data[7]
-        # self.QR.state_var.att_ang[2]                    =   msg.data[8]
-        # self.QR.physical_param.throttle_hover           =   msg.data[9]
-        # self.QR.physical_param.mass                     =   msg.data[10]
-        # self.QR.GnC_param.desired_speed                 =   msg.data[11]
-        # self.QR.GnC_param.virtual_target_distance       =   msg.data[12]
-        # self.QR.GnC_param.distance_change_WP            =   msg.data[13]
-        # self.QR.GnC_param.dist_change_first_WP          =   msg.data[14]
-        # self.QR.GnC_param.Kp_vel                        =   msg.data[15]
-        # self.QR.GnC_param.Kd_vel                        =   msg.data[16]
-        # self.QR.GnC_param.Kp_speed                      =   msg.data[17]
-        # self.QR.GnC_param.Kd_speed                      =   msg.data[18]
-        # self.QR.GnC_param.guid_eta                      =   msg.data[19]
-        # self.QR.GnC_param.tau_phi                       =   msg.data[20]
-        # self.QR.GnC_param.tau_the                       =   msg.data[21]
-        # self.QR.GnC_param.tau_psi                       =   msg.data[22]
-        # self.QR.GnC_param.tau_p                         =   msg.data[23]
-        # self.QR.GnC_param.tau_q                         =   msg.data[24]
-        # self.QR.GnC_param.tau_r                         =   msg.data[25]
-        # self.QR.GnC_param.alpha_p                       =   msg.data[26]
-        # self.QR.GnC_param.alpha_q                       =   msg.data[27]
-        # self.QR.GnC_param.alpha_r                       =   msg.data[28]
-        # self.QR.guid_var.T_cmd                          =   msg.data[29]
-        # self.QR.physical_param.psuedo_rotor_drag_coeff  =   msg.data[30]
-        # self.QR.GnC_param.del_psi_cmd_limit             =   msg.data[31]
-        # self.QR.GnC_param.tau_Wb                        =   msg.data[32]
-
         # self.get_logger().info('subscript_MPPI_input_dbl_Q6 msgs: {0}'.format(msg.data))
         pass
             
@@ -167,8 +132,7 @@ class Node_MPPI_Output(Node):
         # self.get_logger().info('subscript_GPR_input_dbl_NDO msgs: {0}'.format(msg.data))
         
         self.GP.GPR_update(self.QR.guid_var.out_NDO)
-        pass
-
+ 
     #===================================================================================================================
     # Publication Functions   
     #===================================================================================================================
@@ -179,7 +143,7 @@ class Node_MPPI_Output(Node):
         msg.data            =   [self.QR.guid_var.MPPI_ctrl_input[0], self.QR.guid_var.MPPI_ctrl_input[1], self.QR.guid_var.MPPI_ctrl_input[2]]
         
         self.MPPI_output_publisher_.publish(msg)
-        # self.get_logger().info('publish_MPPI_output msgs: {0}'.format(msg.data))
+        # self.get_logger().info('wp_heading: {0}'.format(np.linalg.norm(self.QR.state_var.Vi)))
         # self.get_logger().info("subscript_MPPI_output: [0]=" + str(self.MPPI_ctrl_input[0]) +", [1]=" + str(self.MPPI_ctrl_input[1]) +", [2]=" + str(self.MPPI_ctrl_input[2]))
         pass
 
@@ -194,7 +158,7 @@ class Node_MPPI_Output(Node):
         if self.MPPI_input_int_Q6_received == True and self.MPPI_input_dbl_WP_received == True and self.MPPI_setting_complete == False:
             
             self.MG  = MPPI_guidance.MPPI_Guidance_Modules(self.QR.MPPI_param)
-            self.MG.set_MPPI_entropy_calc_code()
+            
             self.MG.set_total_MPPI_code(self.WP.WPs.shape[0])
             
             self.get_logger().info('MPPI SETTING COMPLETE')

@@ -42,13 +42,13 @@ class NodeAttCtrl(Node):
         
         #.. simulation settings
         self.guid_type_case      =   3       # | 0: Pos. Ctrl     | 1: GL-based  | 2: MPPI-direct | 3: MPPI-GL
-        self.wp_type_selection   =   4       # | 0: straight line | 1: ractangle | 2: circle      | 3: designed | 4: path planning solution
+        self.wp_type_selection   =   4       # | 0: straight line | 1: rectangle | 2: circle      | 3: designed | 4: path planning solution
         
         #.. model settings
         Iris_Param_Physical      = quadrotor_iris_parameters.Physical_Parameter()
         Iris_Param_GnC           = quadrotor_iris_parameters.GnC_Parameter(self.guid_type_case)
         MPPI_Param               = quadrotor_iris_parameters.MPPI_Parameter(Iris_Param_GnC.Guid_type)
-        GPR_Param                = quadrotor_iris_parameters.GPR_Parameter(Iris_Param_GnC.dt_GCU, MPPI_Param.N)
+        GPR_Param                = quadrotor_iris_parameters.GPR_Parameter(MPPI_Param.dt_MPPI, MPPI_Param.N)
         self.QR                  = quadrotor.Quadrotor_6DOF(Iris_Param_Physical, Iris_Param_GnC, MPPI_Param, GPR_Param)
         self.WP                  = waypoint.Waypoint(self.wp_type_selection)
 
@@ -201,6 +201,7 @@ class NodeAttCtrl(Node):
         self.QR.guid_var.MPPI_ctrl_input[0] =   msg.data[0]
         self.QR.guid_var.MPPI_ctrl_input[1] =   msg.data[1]
         self.QR.guid_var.MPPI_ctrl_input[2] =   msg.data[2]
+
         # self.get_logger().info('subscript_MPPI_output msgs: {0}'.format(msg.data))
         pass
 
@@ -262,19 +263,7 @@ class NodeAttCtrl(Node):
                          self.QR.state_var.Vi[0], self.QR.state_var.Vi[1], self.QR.state_var.Vi[2],
                          self.QR.state_var.att_ang[0], self.QR.state_var.att_ang[1], self.QR.state_var.att_ang[2],
                          self.QR.guid_var.T_cmd]
-        # msg.data    =   [self.QR.state_var.Ri[0], self.QR.state_var.Ri[1], self.QR.state_var.Ri[2],
-        #                  self.QR.state_var.Vi[0], self.QR.state_var.Vi[1], self.QR.state_var.Vi[2],
-        #                  self.QR.state_var.att_ang[0], self.QR.state_var.att_ang[1], self.QR.state_var.att_ang[2],
-        #                  self.QR.physical_param.throttle_hover, self.QR.physical_param.mass, 
-        #                  self.QR.GnC_param.desired_speed, self.QR.GnC_param.virtual_target_distance,
-        #                  self.QR.GnC_param.distance_change_WP, self.QR.GnC_param.dist_change_first_WP,
-        #                  self.QR.GnC_param.Kp_vel, self.QR.GnC_param.Kd_vel, self.QR.GnC_param.Kp_speed, 
-        #                  self.QR.GnC_param.Kd_speed, self.QR.GnC_param.guid_eta, 
-        #                  self.QR.GnC_param.tau_phi, self.QR.GnC_param.tau_the, self.QR.GnC_param.tau_psi, 
-        #                  self.QR.GnC_param.tau_p, self.QR.GnC_param.tau_q, self.QR.GnC_param.tau_r,
-        #                  self.QR.GnC_param.alpha_p, self.QR.GnC_param.alpha_q, self.QR.GnC_param.alpha_r,
-        #                  self.QR.guid_var.T_cmd, self.QR.physical_param.psuedo_rotor_drag_coeff, 
-        #                  self.QR.GnC_param.del_psi_cmd_limit, self.QR.GnC_param.tau_Wb]
+
         self.MPPI_input_dbl_Q6_publisher_.publish(msg)
         # self.get_logger().info('pub msgs: {0}'.format(msg.data))
         pass
@@ -329,10 +318,10 @@ class NodeAttCtrl(Node):
                 # state variable initialization
                 self.QR.update_states(self.est_state.pos_NED, self.est_state.vel_NED, self.est_state.eul_ang_rad, self.est_state.accel_xyz)
                 
-                # waypoint settings                     
+                 # waypoint settings                     
                 self.WP.set_values(self.wp_type_selection, self.WP.waypoint_x, self.WP.waypoint_y, self.WP.waypoint_z)
                 self.WP.insert_WP(0, self.QR.state_var.Ri)
-                
+                                
                 ### ---  End  - need configuration of simulation setting --- ###
 
                 self.variable_setting_complete = True
@@ -341,22 +330,31 @@ class NodeAttCtrl(Node):
 
             if self.variable_setting_complete == True :
                 
+                # #.. waypoint rejection (WHEN wp_type_selection == 1 (rectangle path->triangle path))
+                # if (self.QR.PF_var.WP_idx_heading == 5):
+                #     self.QR.PF_var.WP_manual = 1
+
+                # if (self.QR.PF_var.WP_manual == 1):
+                #     self.WP.WPs = self.QR.WP_manual_set(self.WP.WPs)
+                # self.QR.PF_var.WP_manual = 0              
+
                 #.. state variables updates (from px4)
                 self.QR.update_states(self.est_state.pos_NED, self.est_state.vel_NED, self.est_state.eul_ang_rad, self.est_state.accel_xyz)
                 
                 #.. path following required information
                 self.QR.PF_required_info(self.WP.WPs, self.sim_time, self.QR.GnC_param.dt_GCU)
 
-                #.. guidance
-                # self.QR.guid_var.MPPI_ctrl_input[1] = 3.
-                # self.QR.guid_var.MPPI_ctrl_input[2] = self.QR.GnC_param.guid_eta
-                
+                #.. guidance                
                 self.QR.guid_Ai_cmd(self.WP.WPs.shape[0], self.QR.guid_var.MPPI_ctrl_input)  # based on the geometry and VT
+                
+                #.. uav speed log
+                # self.get_logger().info('desired speed: {0}'.format(self.QR.GnC_param.desired_speed_test))
+                           
                 self.QR.guid_compensate_Ai_cmd()                                             # gravity, disturbance rejection
                 self.QR.guid_NDO_for_Ai_cmd()                                                # NDO for disturbance estimation
                 self.QR.guid_convert_Ai_cmd_to_thrust_and_att_ang_cmd(self.WP.WPs)
                 self.QR.guid_convert_att_ang_cmd_to_qd_cmd()
-
+                
                 #.. guidance command
                 self.veh_att_set.thrust_body    =   [0., 0., -self.QR.guid_var.norm_T_cmd]
                 self.veh_att_set.q_d            =   self.QR.guid_var.qd_cmd
