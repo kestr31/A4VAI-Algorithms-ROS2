@@ -2,3 +2,5 @@ collision_avoidance/collision_avoidance/__pycache__/
 controller/controller/__pycache__/
 pathplanning/pathplanning/__pycache__/
 pathfollowing/pathfollowing/__pycache__/
+pathfollowing/pathfollowing/PF_modules/__pycache__
+pub_depth/pub_depth/__pycache__
