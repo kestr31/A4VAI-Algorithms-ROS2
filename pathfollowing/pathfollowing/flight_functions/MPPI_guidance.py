@@ -63,6 +63,8 @@ class MPPI_Guidance_Modules():
         arr_numer3          =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
         arr_denom2          =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
         arr_denom3          =   np.zeros((self.MP.N, self.MP.K)).astype(np.float64)
+
+        arr_out_results     =   np.array([0.,0.,0.]).astype(np.float64)
         # arr_ent_param_float =   np.array([self.MP.lamb1, self.MP.lamb2, self.MP.lamb3]).astype(np.float64)
         # occupy GPU memory space
         gpu_u2              =   cuda.mem_alloc(arr_u2.nbytes)
@@ -83,6 +85,7 @@ class MPPI_Guidance_Modules():
         gpu_denom2          =   cuda.mem_alloc(arr_denom2.nbytes)
         gpu_denom3          =   cuda.mem_alloc(arr_denom3.nbytes)
 
+        gpu_out_results     =   cuda.mem_alloc(arr_out_results.nbytes)
         # convert data memory from CPU to GPU
         cuda.memcpy_htod(gpu_u2,arr_u2)
         cuda.memcpy_htod(gpu_u3,arr_u3)
@@ -101,7 +104,8 @@ class MPPI_Guidance_Modules():
         cuda.memcpy_htod(gpu_numer3, arr_numer3)
         cuda.memcpy_htod(gpu_denom2, arr_denom2)
         cuda.memcpy_htod(gpu_denom3, arr_denom3)
-        
+
+        cuda.memcpy_htod(gpu_out_results, arr_out_results)
         #.. run MPPI Monte Carlo simulation code script
         # run cuda script by using GPU cores
         unit_gpu_allocation = 32        # GPU SP number
@@ -117,7 +121,7 @@ class MPPI_Guidance_Modules():
                 gpu_delta_u2, gpu_delta_u3, gpu_stk,
                 gpu_int_MP, gpu_dbl_MP, gpu_int_QR, gpu_dbl_QR, 
                 gpu_dbl_WPs, gpu_dbl_VT,gpu_Ai_est_dstb, 
-                gpu_numer2,gpu_numer3,gpu_denom2,gpu_denom3,
+                gpu_numer2,gpu_numer3,gpu_denom2,gpu_denom3,gpu_out_results,
                 gpu_ent_param_float,
                 block=blocksz, grid=gridsz)
         t2 = time.time()
@@ -132,6 +136,10 @@ class MPPI_Guidance_Modules():
         cuda.memcpy_dtoh(res_numer3, gpu_numer3)
         cuda.memcpy_dtoh(res_denom2, gpu_denom2)
         cuda.memcpy_dtoh(res_denom3, gpu_denom3)
+
+        res_out_results     =   np.empty_like(arr_out_results)
+        cuda.memcpy_dtoh(res_out_results, gpu_out_results)
+        # print(res_out_results)
         
         #.. MPPI input calculation
         # entropy
@@ -142,6 +150,8 @@ class MPPI_Guidance_Modules():
         denom_min       =   np.zeros(np.size(sum_denom2)) + 1.0e-11
         entropy2    =   sum_numer2/np.maximum(sum_denom2, denom_min)
         entropy3    =   sum_numer3/np.maximum(sum_denom3, denom_min)
+
+        # print(entropy2)
 
         # MPPI input
         self.u2     =   self.u2 + entropy2
@@ -183,7 +193,7 @@ class MPPI_Guidance_Modules():
             double WP_WPs[nWP][3], double PF_var_VT_Ri[3]);
         __device__ void path_following_required_info__takeoff_to_first_WP(double WP_WPs[nWP][3], \
             double QR_Ri[3], int QR_WP_idx_passed, double QR_dist_change_first_WP, double PF_var_VT_Ri[3]);
-        __device__ void path_following_required_info__cost_function_1(double R, double u, \
+        __device__ void path_following_required_info__cost_function_1(double R, double MPPI_ctrl_input[3], \
             double Q0, double dist_to_path, double Q1, double Vi[3], \
             double unit_W1W2[3], double min_V_aligned, double cost_arr[3], double dt);
         __device__ void path_following_required_info__terminal_cost_1(double P1, double WP_WPs[nWP][3], \
@@ -217,7 +227,7 @@ class MPPI_Guidance_Modules():
             int* arr_int_MP, double* arr_dbl_MP, int* arr_int_QR, double* arr_dbl_QR, \
             double* arr_dbl_WPs, double* arr_dbl_VT, double* arr_Ai_est_dstb, \
             double* arr_numer2, double* arr_numer3, \
-            double* arr_denom2, double* arr_denom3, double *arr_ent_param_float)
+            double* arr_denom2, double* arr_denom3, double* arr_out_results, double *arr_ent_param_float)
         {
             //.. GPU core index for parallel computation
             int idx     =   threadIdx.x + threadIdx.y*blockDim.x + blockIdx.x*blockDim.x*blockDim.y + blockIdx.y*blockDim.x*blockDim.y*gridDim.x;
@@ -327,7 +337,7 @@ class MPPI_Guidance_Modules():
             omega_Wb[0]        = sqrt(1/(GnC_param_alpha_p*GnC_param_tau_p));
             omega_Wb[1]        = sqrt(1/(GnC_param_alpha_q*GnC_param_tau_q));
             omega_Wb[2]        = sqrt(1/(GnC_param_alpha_r*GnC_param_tau_r));
-                        
+
             //.. main loop
             int i_N = 0;
             for(i_N = 0; i_N < MP_N; i_N++){
@@ -365,10 +375,10 @@ class MPPI_Guidance_Modules():
                         state_var_Ri, PF_var_WP_idx_passed, GnC_param_dist_change_first_WP, PF_var_VT_Ri);
                 }
                     
-                double u = guid_var_T_cmd/physical_param_mass;
+                //double u = guid_var_T_cmd/physical_param_mass;
                 double Rw1w2[3];  for(int i=0;i<3;i++) Rw1w2[i] = WP_WPs[PF_var_WP_idx_heading][i] - WP_WPs[PF_var_WP_idx_passed][i];
                 double PF_var_unit_Rw1w2[3]; for(int i=0;i<3;i++) PF_var_unit_Rw1w2[i] = Rw1w2[i]/norm_(Rw1w2);
-                path_following_required_info__cost_function_1(MP_R, u, MP_Q[0], PF_var_dist_to_path, \
+                path_following_required_info__cost_function_1(MP_R, MPPI_ctrl_input, MP_Q[0], PF_var_dist_to_path, \
                     MP_Q[1], state_var_Vi, PF_var_unit_Rw1w2, MP_cost_min_V_aligned, PF_var_cost_arr, MP_dt);
                     
                 // for terminal cost
@@ -430,6 +440,10 @@ class MPPI_Guidance_Modules():
                 double cost_sum = 0.;
                 for(int i=0;i<3;i++) cost_sum = cost_sum + PF_var_cost_arr[i];
                 arr_stk[idx]    =   arr_stk[idx] + cost_sum;
+
+                //.. arr_out_results
+                arr_out_results[0] = arr_out_results[0] + PF_var_cost_arr[0];
+                arr_out_results[1] = arr_out_results[1] + PF_var_cost_arr[1];
             }
             
             // terminal cost function            
@@ -445,7 +459,9 @@ class MPPI_Guidance_Modules():
                 min_move_range, total_time, &terminal_cost);
             
             arr_stk[idx] = arr_stk[idx] + terminal_cost;
-            
+
+            //.. arr_out_results
+            arr_out_results[2] = terminal_cost;
             
             //.. MPPI_entropy
             // parameters
@@ -454,10 +470,12 @@ class MPPI_Guidance_Modules():
             i_N = 0;
             for(i_N = 0; i_N < MP_N; i_N++){
                 arr_numer2[idx + MP_K*i_N] = exp(  (-1/lamb2)*arr_stk[idx]  )*arr_delta_u2[idx + MP_K*i_N];
-                arr_denom2[idx + MP_K*i_N] = exp((-1/lamb2)*arr_stk[idx]);
+                arr_denom2[idx + MP_K*i_N] = max(exp((-1/lamb2)*arr_stk[idx]), 1e-20);
                 arr_numer3[idx + MP_K*i_N] = exp((-1/lamb3)*arr_stk[idx])*arr_delta_u3[idx + MP_K*i_N];
-                arr_denom3[idx + MP_K*i_N] = exp((-1/lamb3)*arr_stk[idx]);
+                arr_denom3[idx + MP_K*i_N] = max(exp((-1/lamb3)*arr_stk[idx]), 1e-20);
             }
+
+
         }
         
         // utility functions
@@ -591,17 +609,18 @@ class MPPI_Guidance_Modules():
                 }
             }
         }
-        __device__ void path_following_required_info__cost_function_1(double R, double u, \
+        __device__ void path_following_required_info__cost_function_1(double R, double MPPI_ctrl_input[3], \
             double Q0, double dist_to_path, double Q1, double Vi[3], \
             double unit_W1W2[3], double min_V_aligned, double cost_arr[3], double dt)
         {
             // uRu of LQR cost, set low value of norm(R)
-            double uRu = u * R * u ; 
+            double uRu = 0; 
+            for(int i=1; i<3; i++) uRu = uRu + R*MPPI_ctrl_input[i]*MPPI_ctrl_input[i];
             
             // path following performance
             double x0 = dist_to_path;
-            double x0Q0x0 = x0 * Q0 * x0;
-            //double x0Q0x0 = x0 * Q0 * x0 * x0 * x0 * x0 * x0;
+            //double x0Q0x0 = x0 * Q0 * x0;
+            double x0Q0x0 = x0 * Q0 * x0 * x0 * x0 * x0 * x0;
             
             // energy consumption efficiency 
             //double V_aligned = max(dot_(unit_W1W2, Vi), min_V_aligned);
