@@ -130,6 +130,14 @@ class Controller(Node):
 
         # region MISCELLANEOUS SUBSRIBERS
         # -----------------------------------------------------------------------------------------------------------------
+
+        # self.DepthSubscriber_ = self.create_subscription(
+        #     Image,
+        #     '/depth/raw',
+        #     self.DepthCallback,
+        #     1
+        #     )
+        
         self.LidarSubscriber_ = self.create_subscription(
             PointCloud2,
             '/airsim_node/SimpleFlight/lidar/RPLIDAR_A3',
