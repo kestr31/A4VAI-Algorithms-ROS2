@@ -1,6 +1,6 @@
 ############################################################
 #
-#   - Name : UtilityFunctions.py
+#   - Name : utility_funcs.py
 #
 #                   -   Created by E. T. Jeong, 2023.01.09
 #
@@ -8,7 +8,7 @@
 
 #.. Library
 # pulbic libs.
-from math import sin, cos, atan2, sqrt
+from math import sin, cos, atan2, sqrt, asin
 from numpy import zeros
 
 # private libs.
@@ -50,3 +50,41 @@ def azim_elev_from_vec3(Vec3):
 #.. set_angle_range
 def set_angle_range(ang_in):
     return atan2(sin(ang_in),cos(ang_in))
+
+#.. Euler to Quaternion
+def Euler2Quaternion(EulerAng):
+
+    Roll  = EulerAng[0]
+    Pitch = EulerAng[1]
+    Yaw   = EulerAng[2]
+
+    CosYaw = cos(Yaw * 0.5)
+    SinYaw = sin(Yaw * 0.5)
+    CosPitch = cos(Pitch * 0.5)
+    SinPitch = sin(Pitch * 0.5)
+    CosRoll = cos(Roll * 0.5)
+    SinRoll= sin(Roll * 0.5)
+    
+    w = CosRoll * CosPitch * CosYaw + SinRoll * SinPitch * SinYaw
+    x = SinRoll * CosPitch * CosYaw - CosRoll * SinPitch * SinYaw
+    y = CosRoll * SinPitch * CosYaw + SinRoll * CosPitch * SinYaw
+    z = CosRoll * CosPitch * SinYaw - SinRoll * SinPitch * CosYaw
+    
+    return w, x, y, z
+
+#.. Quaternion to Euler
+def Quaternion2Euler(w, x, y, z):
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + y * y)
+    Roll = atan2(t0, t1)
+
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    Pitch = asin(t2)
+
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    Yaw = atan2(t3, t4)
+
+    return Roll, Pitch, Yaw
