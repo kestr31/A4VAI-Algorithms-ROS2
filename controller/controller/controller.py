@@ -59,12 +59,6 @@ class Controller(Node):
             self.vehicle_status_callback,
             self.qos_profile
         )
-        self.agl_subscriber = self.create_subscription(
-            VehicleGlobalPosition,
-            '/fmu/out/vehicle_global_position',
-            self.agl_callback,
-            self.qos_profile
-        )
         # endregion
         # -----------------------------------------------------------------------------------------------------------------
 
@@ -398,10 +392,6 @@ class Controller(Node):
     def vehicle_status_callback(self, vehicle_status):
         self.vehicle_status = vehicle_status
 
-    # ?????
-    def agl_callback(self,msg):
-        self.agl = msg.alt_ellipsoid
-
     # endregion
     # -----------------------------------------------------------------------------------------------------------------
     
@@ -456,7 +446,7 @@ class Controller(Node):
         msg.path_planning_complete = self.path_planning_complete
         msg.waypoint_x             = self.waypoint_x
         msg.waypoint_y             = self.waypoint_y
-        msg.waypoint_z             = (np.add(self.waypoint_z, float(self.agl-5))).tolist()
+        msg.waypoint_z             = self.waypoint_z
         self.local_waypoint_publisher.publish(msg)
 
     # publish waypoint convert flag
