@@ -74,7 +74,7 @@ def setInitialVariables(classIn):
 
     ## initialize path planning parameter
     # path planning global waypoint [x, z, y]
-    classIn.start_point        =   [50.0, 5.0, 50.0]
+    classIn.start_point        =   [0.0, 5.0, 0.0]
     classIn.goal_point         =   [950.0, 5.0, 950.0]
 
     # path planning waypoint list
