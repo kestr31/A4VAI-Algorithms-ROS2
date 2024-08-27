@@ -1,8 +1,10 @@
 # Librarys
 
 # Library for common
+import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from PIL import Image
 
 # ROS libraries
 import rclpy
@@ -113,6 +115,7 @@ class PathPlanningTest(Node):
         self.waypoint_x = msg.waypoint_x
         self.waypoint_y = msg.waypoint_y
         self.waypoint_z = msg.waypoint_z
+        self.waypoint_z = [(x+10) * 0.1 for x in self.waypoint_z]
     
         self.path_planning_complete = msg.path_planning_complete
 
@@ -159,20 +162,35 @@ class PathPlanningTest(Node):
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        
+        # Plot height map on 3D plot
+        image_path = '/home/user/workspace/ros2/ros2_ws/src/pathplanning/pathplanning/map/512-001.png'
+        img = Image.open(image_path).convert('L') 
+        height_map = np.array(img)
+
+        # X, Y 축 생성
+        x = np.linspace(0, height_map.shape[1] - 1, height_map.shape[1])
+        y = np.linspace(0, height_map.shape[0] - 1, height_map.shape[0])
+        x, y = np.meshgrid(x, y)
+
+        # Z 축은 높이 맵의 픽셀 값으로 설정
+        z = height_map*0.1
+
+        # 3D 플롯 생성
+        self.ax2.plot_surface(x, y, z, cmap='viridis', alpha=0.5)
+
         # region Plot 2 altutude
-
         # Plot global waypoints with blue color
-
-
-        # Plot local waypoints with red color
         self.ax2.scatter(
             [self.start_point[0], self.goal_point[0]],
             [self.start_point[2], self.goal_point[2]],
-            [self.start_point[1], self.goal_point[1]],
+            [self.start_point[1]*0.1, self.goal_point[1]],
             color="blue",
             label="Local Waypoints",
             s=70,
         )
+
+        # Plot local waypoints with red color
         self.ax2.plot(
             self.waypoint_x,
             self.waypoint_y,
@@ -182,15 +200,20 @@ class PathPlanningTest(Node):
         )
 
         # set the title, x and y labels
-        self.ax2.set_title("Vihicle Position")
-        self.ax2.set_xlabel("X Coordinate")
-        self.ax2.set_ylabel("Y Coordinate")
-        self.ax2.set_zlabel("Z Coordinate")
+
+        self.ax2.set_title('3D Height Map')
+        self.ax2.set_xlabel('X axis')
+        self.ax2.set_ylabel('Y axis')
+        self.ax2.set_zlabel('Height (Z)')
         self.ax2.legend()
+        
 
         self.get_logger().info("======================================================")
         self.get_logger().info("plot")
         self.get_logger().info("======================================================")
+
+        plt.axis('equal')
+        self.ax2.set_zlim(0, 100)
 
         plt.tight_layout()
         plt.draw()
