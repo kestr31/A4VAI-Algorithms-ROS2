@@ -31,6 +31,7 @@ def setInitialVariables(classIn):
     classIn.vehicle_x = np.array([])  # [m]
     classIn.vehicle_y = np.array([])  # [m]
     classIn.vehicle_z = np.array([])  # [m]
+    classIn.vehicle_heading = 0       # [rad]
 
     # set qos profile
     classIn.qos_profile = QoSProfile(

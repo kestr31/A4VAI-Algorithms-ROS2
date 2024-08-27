@@ -2,6 +2,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 
 # Library for ros2
 import rclpy
@@ -84,6 +85,7 @@ class Plotter(Node):
         vehicle_x = np.array(msg.x)
         vehicle_y = np.array(msg.y)
         vehicle_z = np.array(-msg.z)
+        self.vehicle_heading = msg.heading
 
         # append to list
         self.vehicle_x = np.append(self.vehicle_x, vehicle_x).flatten()
@@ -136,9 +138,8 @@ class Plotter(Node):
                     self.vehicle_y,
                     color="green",
                     label="Vehicle Position",
-                    linewidth=1,
+                    linewidth=4,
                 )
-
             # set the title, x and y labels
             self.ax1.set_title("full trajectory")
             self.ax1.set_xlabel("X Coordinate")
@@ -159,7 +160,6 @@ class Plotter(Node):
                 [self.start_global_waypoint[0], self.goal_global_waypoint[0]],
                 [self.start_global_waypoint[2], self.goal_global_waypoint[2]],
                 color="blue",
-                label="Global Waypoint",
                 s=70,
             )
 
@@ -168,14 +168,15 @@ class Plotter(Node):
                 self.waypoint_x,
                 self.waypoint_y,
                 color="red",
-                label="Local Waypoints",
                 s=6,
             )
             self.ax2.plot(
                 self.waypoint_x,
                 self.waypoint_y,
                 color="red",
+                label="Local Waypoints",
                 linewidth=4,
+                alpha=0.5,
             )
 
             if len(self.vehicle_x) > 0:
@@ -194,6 +195,23 @@ class Plotter(Node):
 
                 self.ax2.set_xlim([x_center - margin, x_center + margin])
                 self.ax2.set_ylim([y_center - margin, y_center + margin])
+
+                # Calculate the components of the direction vectors
+                u = np.cos(self.vehicle_heading)
+                v = np.sin(self.vehicle_heading)
+
+                # Plot arrows representing vehicle heading and save the quiver object
+                self.quiver_obj = self.ax2.quiver(
+                    self.vehicle_x[-1],
+                    self.vehicle_y[-1],
+                    u,
+                    v,
+                    angles="xy",
+                    scale_units="xy",
+                    scale=0.3,
+                    label="heading",
+                    color="blue",
+                )
 
             # set the title, x and y labels
             self.ax2.set_title("Vihicle Position")
