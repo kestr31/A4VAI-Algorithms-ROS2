@@ -17,7 +17,10 @@ from custom_msgs.msg import LocalWaypointSetpoint, ConveyLocalWaypointComplete
 from custom_msgs.msg import Heartbeat
 from geometry_msgs.msg import Twist 
 from sensor_msgs.msg import PointCloud2
+
 from std_msgs.msg import Bool
+from std_msgs.msg import Float32
+from sensor_msgs.msg import Image
 
 from .give_global_waypoint import GiveGlobalWaypoint
 from .commonFcn import *
@@ -125,19 +128,19 @@ class Controller(Node):
         # region MISCELLANEOUS SUBSRIBERS
         # -----------------------------------------------------------------------------------------------------------------
 
-        # self.DepthSubscriber_ = self.create_subscription(
-        #     Image,
-        #     '/depth/raw',
-        #     self.DepthCallback,
-        #     1
-        #     )
+        self.DepthSubscriber_ = self.create_subscription(
+            Image,
+            '/depth/raw',
+            self.DepthCallback,
+            1
+            )
         
-        self.LidarSubscriber_ = self.create_subscription(
-            PointCloud2,
-            '/airsim_node/SimpleFlight/lidar/RPLIDAR_A3',
-            self.LidarCallback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
-        )
+        # self.LidarSubscriber_ = self.create_subscription(
+        #     PointCloud2,
+        #     '/airsim_node/SimpleFlight/lidar/RPLIDAR_A3',
+        #     self.LidarCallback,
+        #     QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
+        # )
         # endregion
         # -----------------------------------------------------------------------------------------------------------------
         # endregion
@@ -190,6 +193,23 @@ class Controller(Node):
             '/waypoint_convert_flag',
             10
         )
+        self.state_publisher = self.create_publisher(
+            Bool,
+            '/controller_state',
+            10
+        )
+
+        self.min_distance_publisher = self.create_publisher(
+            Float32,
+            '/min_distance',
+            10
+        )
+
+        self.heading_publisher = self.create_publisher(
+            Float32,
+            '/heading',
+            10
+        )
         # endregion
         # -----------------------------------------------------------------------------------------------------------------
         # endregion
@@ -234,7 +254,7 @@ class Controller(Node):
     
             # send offboard heartbeat signal to px4 
             self.publish_offboard_control_mode(self.prm_off_con_mod)
-    
+            self.publish_heading()
             # check initial position
             if self.initial_position_flag == True:
                 
@@ -255,6 +275,7 @@ class Controller(Node):
                     
                 # do path following if local waypoint transmit to path following is complete 
                 else:
+                    self.publish_state()
                     if self.obstacle_flag == False:
 
                         self.collision_avoidance_flag   =   False
@@ -265,7 +286,6 @@ class Controller(Node):
                         self.path_following_flag        =   True
                         
                         self.collision_avoidance_end_timer    =   True
-                        
                     else:
                         self.collision_avoidance_flag   =   True
                         self.path_following_flag        =   False
@@ -378,6 +398,8 @@ class Controller(Node):
         self.v_x    =   msg.vx
         self.v_y    =   msg.vy
         self.v_z    =   msg.vz
+        self.vehicle_heading = msg.heading
+
 
     # update attitude
     def vehicle_attitude_callback(self, msg):
@@ -398,6 +420,34 @@ class Controller(Node):
     # region 5. MISCELLANEOUS callback Functions
     # -----------------------------------------------------------------------------------------------------------------
     
+    def DepthCallback(self, msg):
+        image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+        try:
+            # Convert the ROS Image message to OpenCV format
+            image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+        except Exception as e:
+            return
+        
+
+        valid_mask = valid_mask = (image < 100) & (image > 0.5)
+
+        valid_depths = image[valid_mask]
+
+        self.min_distance = valid_depths.min()
+        self.publish_min_distance()
+        
+        if self.min_distance < 3.0:
+            self.obstacle_check = True
+        else:
+            self.obstacle_flag = False
+
+        if self.obstacle_check == True and self.min_distance < 4.0:
+            self.obstacle_flag = True
+        else:
+            self.obstacle_check = False
+            self.obstacle_flag = False
+
+
     def LidarCallback(self, pc_msg):
         if pc_msg.is_dense is True :
             
@@ -410,23 +460,23 @@ class Controller(Node):
             x = point['x']
             y = point['y']
             dist = np.sqrt(x **2 + y ** 2)
-            self.min_dist = np.min(dist)
+        #     self.min_dist = np.min(dist)
             
-            if self.z < -2.0:
-                if self.min_dist < 5.0:
-                    self.obstacle_check = True
-                else : 
-                    self.obstacle_flag = False
+        #     if self.z < -2.0:
+        #         if self.min_dist < 5.0:
+        #             self.obstacle_check = True
+        #         else : 
+        #             self.obstacle_flag = False
                     
-                if self.obstacle_check == True and self.min_dist < 7.0:
-                    self.obstacle_flag = True
-                else :
-                    self.obstacle_check = False
-                    self.obstacle_flag  = False
-            else :
-                self.obstacle_flag = False
-        else : 
-            pass
+        #         if self.obstacle_check == True and self.min_dist < 7.0:
+        #             self.obstacle_flag = True
+        #         else :
+        #             self.obstacle_check = False
+        #             self.obstacle_flag  = False
+        #     else :
+        #         self.obstacle_flag = False
+        # else : 
+        #     pass
 
     # endregion
     # -----------------------------------------------------------------------------------------------------------------
@@ -546,6 +596,23 @@ class Controller(Node):
         msg.heartbeat = True
         self.heartbeat_publisher.publish(msg)
 
+    def publish_state(self):
+        msg = Bool()
+        if self.obstacle_flag == True:
+            msg.data = True
+        else:
+            msg.data = False
+        self.state_publisher.publish(msg)
+
+    def publish_min_distance(self):
+        msg = Float32()
+        msg.data = float(self.min_distance)
+        self.min_distance_publisher.publish(msg)
+
+    def publish_heading(self):
+        msg = Float32()
+        msg.data = float(self.vehicle_heading)
+        self.heading_publisher.publish(msg)
     # endregion
     # -----------------------------------------------------------------------------------------------------------------
     # endregion

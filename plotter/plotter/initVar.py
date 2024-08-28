@@ -17,6 +17,7 @@ def setInitialVariables(classIn):
     # initialize flag
     classIn.global_waypoint_set = False  # flag whether global waypoint is subscribed
     classIn.local_waypoint_set = False  # flag whether local waypoint is subscribed
+    classIn.state  = False # flag whether state is subscribed
 
     # initialize global waypoint
     classIn.start_global_waypoint = []  # start global waypoint
@@ -32,7 +33,10 @@ def setInitialVariables(classIn):
     classIn.vehicle_y = np.array([])  # [m]
     classIn.vehicle_z = np.array([])  # [m]
     classIn.vehicle_heading = 0       # [rad]
+    classIn.min_distance    = 0       # [m]
 
+
+    classIn.current_heading_waypoint_callback_counter = 1
     # set qos profile
     classIn.qos_profile = QoSProfile(
         reliability=ReliabilityPolicy.BEST_EFFORT,

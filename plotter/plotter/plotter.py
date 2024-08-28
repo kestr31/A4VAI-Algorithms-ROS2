@@ -14,6 +14,11 @@ from custom_msgs.msg import GlobalWaypointSetpoint, LocalWaypointSetpoint
 # Library for px4 message
 from px4_msgs.msg import VehicleLocalPosition
 
+# Library for std_msgs
+from std_msgs.msg import Bool
+from std_msgs.msg import Int32
+from std_msgs.msg import Float32
+
 # submodule for initial variables
 from .initVar import *
 
@@ -49,6 +54,21 @@ class Plotter(Node):
             "/fmu/out/vehicle_local_position",
             self.vehicle_local_position_callback,
             self.qos_profile,
+        )
+
+        self.state_subscriber = self.create_subscription(
+            Bool, "/controller_state", self.state_callback, 10
+        )
+
+        self.current_heading_waypoint_subscriber =   self.create_subscription(
+            Int32, '/current_heading_waypoint', self.current_heading_waypoint_callback, 1)
+
+
+        self.min_distance_subscriber = self.create_subscription(
+            Float32,
+            '/min_distance',
+            self.min_distance_callback,
+            10,
         )
         # endregion
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -92,6 +112,21 @@ class Plotter(Node):
         self.vehicle_y = np.append(self.vehicle_y, vehicle_y).flatten()
         self.vehicle_z = np.append(self.vehicle_z, vehicle_z).flatten()
 
+    def state_callback(self, msg):
+        self.state = msg.data
+
+    def current_heading_waypoint_callback(self, msg):
+        if msg.data != self.current_heading_waypoint_callback_counter:
+            self.current_heading_waypoint_callback_counter = msg.data -1
+            (self.waypoint_x).remove(self.waypoint_x[msg.data - self.current_heading_waypoint_callback_counter])
+            (self.waypoint_y).remove(self.waypoint_y[msg.data - self.current_heading_waypoint_callback_counter])
+            (self.waypoint_z).remove(self.waypoint_z[msg.data - self.current_heading_waypoint_callback_counter])
+        self.get_logger().info(str(msg.data))
+        self.get_logger().info(str(self.current_heading_waypoint_callback_counter))
+        self.get_logger().info(str(self.waypoint_x))
+    def min_distance_callback(self, msg):
+        self.min_distance = msg.data
+
     # endregion
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -124,6 +159,9 @@ class Plotter(Node):
                 label="Local Waypoints",
                 s=6,
             )
+            for i, (x, y) in enumerate(zip(self.waypoint_x, self.waypoint_y)):
+                self.ax1.text(x, y, str(i), fontsize=9, ha='right', color='blue')
+
             self.ax1.plot(
                 self.waypoint_x,
                 self.waypoint_y,
@@ -145,7 +183,10 @@ class Plotter(Node):
             self.ax1.set_xlabel("X Coordinate")
             self.ax1.set_ylabel("Y Coordinate")
             self.ax1.legend()
-
+            self.ax1.xlim = [0, 1000]
+            self.ax1.ylim = [0, 1000]
+            self.ax1.grid()
+            self.ax1.axis('equal')
             # endregion
             # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -170,6 +211,9 @@ class Plotter(Node):
                 color="red",
                 s=6,
             )
+            for i, (x, y) in enumerate(zip(self.waypoint_x, self.waypoint_y)):
+                self.ax1.text(x, y, str(i), fontsize=9, ha='right', color='blue')
+
             self.ax2.plot(
                 self.waypoint_x,
                 self.waypoint_y,
@@ -218,6 +262,30 @@ class Plotter(Node):
             self.ax2.set_xlabel("X Coordinate")
             self.ax2.set_ylabel("Y Coordinate")
             self.ax2.legend()
+            self.ax2.grid()
+
+            # 텍스트를 추가할 위치 (x, y) 좌표
+            x_position = x_center  # x축에서의 위치 (0~1)
+            y_position = y_center + 10  # y축에서의 위치 (0~1)
+            if self.state == True:
+                self.ax2.text(
+                    x_center,
+                    y_center - 7,
+                    "Coliision Avoidance",
+                    fontsize=12,
+                    ha="center",
+                )
+                self.ax2.text(
+                    x_center,
+                    y_center - 9,
+                    "Depth min distance    :" + str(self.min_distance),
+                    fontsize=10,
+                    ha="center",
+                )
+            else:
+                self.ax2.text(
+                    x_center, y_center - 5, "Path Following", fontsize=12, ha="center"
+                )
 
             # endregion
             # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -324,6 +392,9 @@ class Plotter(Node):
                     label="Vehicle Position",
                     linewidth=4,
                 )
+            for i, (x, y) in enumerate(zip(self.waypoint_x, self.waypoint_y)):
+                self.ax1.text(x, y, str(i), fontsize=9, ha='right', color='blue')
+
                 # 드론의 위치에 따라 시점 고정
                 x_center = self.vehicle_x[-1]
                 z_center = self.vehicle_z[-1]
@@ -365,6 +436,9 @@ class Plotter(Node):
                 label="Local Waypoints",
                 s=6,
             )
+            for i, (x, y) in enumerate(zip(self.waypoint_x, self.waypoint_y)):
+                self.ax1.text(x, y, str(i), fontsize=9, ha='right', color='blue')
+
             self.ax4.plot(
                 self.waypoint_y,
                 self.waypoint_z,
@@ -389,12 +463,14 @@ class Plotter(Node):
                 self.ax4.set_xlim([y_center - margin, y_center + margin])
                 self.ax4.set_ylim([z_center - margin, z_center + margin])
 
+                
+
             # set the title, x and y labels
             self.ax4.set_title("Altitude Y-Z plane")
             self.ax4.set_xlabel("Y Coordinate")
             self.ax4.set_ylabel("Z Coordinate")
             self.ax4.legend()
-
+            self.ax4.grid()
             # endregion
             # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 

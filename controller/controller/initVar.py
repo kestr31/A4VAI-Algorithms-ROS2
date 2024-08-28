@@ -3,6 +3,7 @@ import numpy as np
 
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from px4_msgs.msg import VehicleCommand
+from cv_bridge import CvBridge
 
 def setInitialVariables(classIn):
     ## initialize flag
@@ -27,6 +28,7 @@ def setInitialVariables(classIn):
     classIn.path_following_heartbeat           =   False
     classIn.collision_avoidance_heartbeat      =   False
 
+    classIn.bridge = CvBridge()
 
     classIn.collision_avidance_time = 100
     classIn.collision_avidance_elapsed_time = 0
@@ -58,13 +60,16 @@ def setInitialVariables(classIn):
     classIn.theta  =   0       # [rad]
     classIn.phi    =   0       # [rad]
 
+    classIn.vehicle_heading = 0
     # Body frame Angular Velocity
     classIn.p      =   0       # [rad/s]
     classIn.q      =   0       # [rad/s]
     classIn.r      =   0       # [rad/s]
 
+    classIn.min_distance = 0
+
     # initial position
-    classIn.initial_position = [0.0, 0.0, -11.0]
+    classIn.initial_position = [0.0, 0.0, -10.0]
 
     #.. callback state_logger
     # classIn.period_state_logger = 0.1
@@ -74,7 +79,7 @@ def setInitialVariables(classIn):
 
     ## initialize path planning parameter
     # path planning global waypoint [x, z, y]
-    classIn.start_point        =   [0.0, 5.0, 0.0]
+    classIn.start_point        =   [0.0, 10.0, 0.0]
     classIn.goal_point         =   [950.0, 5.0, 950.0]
 
     # path planning waypoint list

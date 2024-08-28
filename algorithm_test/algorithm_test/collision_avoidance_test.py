@@ -19,7 +19,7 @@ from px4_msgs.msg import VehicleCommand
 from px4_msgs.msg import OffboardControlMode
 from px4_msgs.msg import VehicleAttitudeSetpoint
 
-class PathFollowingTest(Node):
+class PathPlanningTest(Node):
     def __init__(self):
         super().__init__("give_global_waypoint")
 
@@ -303,7 +303,7 @@ class PathFollowingTest(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    path_planning_test = PathFollowingTest()
+    path_planning_test = PathPlanningTest()
     rclpy.spin(path_planning_test)
     path_planning_test.destroy_node()
     rclpy.shutdown()

@@ -752,9 +752,10 @@ class PathPlanningServer(Node):  # topic 이름과 message 타입은 서로 매�
     def local_waypoint_publish(self):
         msg = LocalWaypointSetpoint()
         msg.path_planning_complete = self.path_planning_complete
-        msg.waypoint_x = self.waypoint_y
-        msg.waypoint_y = self.waypoint_x
-        msg.waypoint_z = [x * 0.1 for x in self.waypoint_z]
+        msg.waypoint_x = self.waypoint_x
+        msg.waypoint_y = self.waypoint_y
+
+        msg.waypoint_z = self.waypoint_z[0:2]+[x * 0.1 for x in (self.waypoint_z[2:])]
         self.local_waypoint_publisher.publish(msg)
         print("                                          ")
         print("==  Sended local waypoint to controller ==")
