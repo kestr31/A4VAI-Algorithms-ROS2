@@ -17,9 +17,6 @@ from rclpy.node import Node
 import numpy as np
 import onnx
 import onnxruntime as ort
-import matplotlib as plt
-import torch as th
-import torch.nn as nn
 import cv2
 from gymnasium import spaces
 import torch.nn.functional as F
@@ -34,136 +31,6 @@ from custom_msgs.msg import Heartbeat
 
 
 #############################################################################################################
-
-
-class LightUNet(nn.Module):
-    def __init__(self, n_channels, n_classes, bilinear=True):
-        super(LightUNet, self).__init__()
-        self.n_channels = n_channels
-        self.n_classes = n_classes
-        self.bilinear = bilinear
-
-        self.inc = DoubleConv(n_channels, 32)
-        self.down1 = Down(32, 64)
-        self.down2 = Down(64, 128)
-        self.down3 = Down(128, 256)
-        factor = 2 if bilinear else 1
-        self.down4 = Down(256, 512 // factor)
-        self.up1 = Up(512, 256 // factor, bilinear)
-        self.up2 = Up(256, 128 // factor, bilinear)
-        self.up3 = Up(128, 64 // factor, bilinear)
-        self.up4 = Up(64, 32, bilinear)
-        self.outc = OutConv(32, n_classes)
-
-    def forward(self, x):
-        x1 = self.inc(x)
-        x2 = self.down1(x1)
-        x3 = self.down2(x2)
-        x4 = self.down3(x3)
-        x5 = self.down4(x4)
-        x = self.up1(x5, x4)
-        x = self.up2(x, x3)
-        x = self.up3(x, x2)
-        x = self.up4(x, x1)
-        logits = self.outc(x)
-
-        # Global Average Pooling to reduce spatial dimensions
-        pooled = F.adaptive_avg_pool2d(logits, (1, 1))
-        pooled = pooled.view(pooled.size(0), -1)  # Flatten to (batch_size, features_dim)
-
-        # Output range [-1, 1]
-        pooled = th.tanh(pooled)
-
-        return pooled
-
-
-class DoubleConv(nn.Module):
-    def __init__(self, in_channels, out_channels, mid_channels=None):
-        super().__init__()
-        if not mid_channels:
-            mid_channels = out_channels
-        self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(mid_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
-        )
-
-    def forward(self, x):
-        return self.double_conv(x)
-
-
-class Down(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.maxpool_conv = nn.Sequential(
-            nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels)
-        )
-
-    def forward(self, x):
-        return self.maxpool_conv(x)
-
-
-class Up(nn.Module):
-    def __init__(self, in_channels, out_channels, bilinear=True):
-        super().__init__()
-        if bilinear:
-            self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
-        else:
-            self.up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
-            self.conv = DoubleConv(in_channels, out_channels)
-
-    def forward(self, x1, x2):
-        x1 = self.up(x1)
-        diffY = x2.size()[2] - x1.size()[2]
-        diffX = x2.size()[3] - x1.size()[3]
-
-        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
-                        diffY // 2, diffY - diffY // 2])
-        x = th.cat([x2, x1], dim=1)
-        return self.conv(x)
-
-
-class OutConv(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(OutConv, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
-
-    def forward(self, x):
-        return self.conv(x)
-
-
-class CustomCNN(nn.Module):
-    def __init__(self, observation_space, features_dim=8):
-        super(CustomCNN, self).__init__()
-        n_input_channels = observation_space.shape[0]  # Should be 3 for RGB images
-
-        self.cnn = LightUNet(n_input_channels, features_dim)
-
-        # Dynamically calculate the output size
-        with th.no_grad():
-            sample_input = th.zeros((1, n_input_channels, *observation_space.shape[1:]))
-            sample_output = self.cnn(sample_input)
-            n_flatten = sample_output.shape[1]
-
-        self.fc = nn.Sequential(
-            nn.Linear(n_flatten, features_dim),
-            nn.ReLU(),
-            nn.Linear(features_dim, features_dim)
-        )
-
-    def forward(self, observations):
-        x = self.cnn(observations)
-        x = self.fc(x)
-        # Scale feature vector to [-1, 1]
-        x = th.tanh(x) * 4
-        return x
-
-
 class PathPlanning:
     def __init__(self, onnx_path, heightmap_path, start, goal, n_waypoints=8, scale_factor=10, target_size=80,
                  z_factor=5):
@@ -197,9 +64,6 @@ class PathPlanning:
         if np.linalg.norm(np.array(start) - np.array(goal)) < self.distance:
             raise ValueError("Start and Goal is too close")
 
-        # Initialize the CNN feature extractor
-        self.feature_extractor = CustomCNN(spaces.Box(low=0, high=255, shape=(3, 256, 256), dtype=np.uint8),
-                                           features_dim=8)
 
     def load_heightmap(self, path):
         heightmap_image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
@@ -215,50 +79,87 @@ class PathPlanning:
                                        (heightmap.shape[1] // resize_factor, heightmap.shape[0] // resize_factor))
         return heightmap_resized
 
-    def generate_observation(self):
-        height_normalized = cv2.normalize(self.heightmap_resized, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-        obs = np.zeros((self.heightmap_resized.shape[0], self.heightmap_resized.shape[1], 3), dtype=np.uint8)
-        obs[:, :, 0] = height_normalized
-        obs[:, :, 1] = height_normalized
-        obs[:, :, 2] = height_normalized
-
-        #start_x, start_y, start_z_1 = self.start
-        #goal_x, goal_y, goal_z_1 = self.goal
-
+  # 수정된 _get_obs 함수 (시작점과 도착점 표시 명확화)
+    def _get_obs(self):
+        # 높이맵 정규화 (0 to 255)
+        height_normalized = cv2.normalize(self.heightmap_resized, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        
+        # 경사도 계산 및 정규화
+        gradient_x = cv2.Sobel(self.heightmap_resized, cv2.CV_64F, 1, 0, ksize=3)
+        gradient_y = cv2.Sobel(self.heightmap_resized, cv2.CV_64F, 0, 1, ksize=3)
+        gradient_magnitude = np.sqrt(gradient_x**2 + gradient_y**2)
+        gradient_normalized = cv2.normalize(gradient_magnitude, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        
+        # 곡률 계산 및 정규화
+        curvature = cv2.Laplacian(self.heightmap_resized, cv2.CV_64F)
+        curvature_normalized = cv2.normalize(curvature, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        
+        # 3채널 이미지 생성
+        self.raw_obs = np.stack([height_normalized, gradient_normalized, curvature_normalized], axis=-1)
+        
+        # 경로 강조를 위한 마스크 생성
+        path_mask = np.zeros_like(height_normalized)
+        
+        # 시작점과 목표점 표시
+        #start_x, start_y = self.start
+        #goal_x, goal_y = self.goal
         start_x = int(self.start[0]/self.scale_factor_waypoint_w)
         start_y = int(self.start[1]/self.scale_factor_waypoint_h)
-        start_z_1 = int(self.start[2])
-
+        
         goal_x = int(self.goal[0]/self.scale_factor_waypoint_w)
         goal_y = int(self.goal[1]/self.scale_factor_waypoint_h)
-        goal_z_1 = int(self.goal[2])
-
-        start_z = self.heightmap_resized[int(start_x), int(start_y)] / 255.0
-        start_color = [0, int(255 * (1 - 0.4 * start_z)), 0]
-        cv2.circle(obs, (start_y, start_x), 3, start_color, -1)
-
-        goal_z = self.heightmap_resized[int(goal_x), int(goal_y)] / 255.0
-        goal_color = [int(255 * (1 - 0.4 * goal_z)), 0, 0]
-        cv2.circle(obs, (goal_y, goal_x), 3, goal_color, -1)
-
+       
+        
+        cv2.circle(path_mask, (start_y, start_x), 3, 255, -1)
+        cv2.circle(path_mask, (goal_y, goal_x), 3, 255, -1)
+        
+        # 경로 표시 (고도에 따라 색상 변화)
+        # if len(self.agent1_path) > 1:
+        #     for i in range(len(self.agent1_path) - 1):
+        #         x1, y1 = self.agent1_path[i]
+        #         x2, y2 = self.agent1_path[i+1]
+                
+        #         # 현재 세그먼트의 평균 고도 계산
+        #         avg_height = (self.heightmap_resized[x1, y1] + self.heightmap_resized[x2, y2]) / 2
+                
+        #         # 고도에 따라 색상 결정 (낮은 고도: 얇은 선, 높은 고도: 두꺼운 선)
+        #         thickness = int(1 + (avg_height / np.max(self.heightmap_resized)) * 4)
+        #         cv2.line(path_mask, (y1, x1), (y2, x2), 255, thickness)
+        
+        # 경로 마스크를 이용해 원본 이미지에 경로 강조
+        self.raw_obs[:,:,0] = cv2.addWeighted(self.raw_obs[:,:,0], 1, path_mask, 0.5, 0)
+        
+        # 채널 순서 변경 (H, W, C) -> (C, H, W)
+        obs = np.transpose(self.raw_obs, (2, 0, 1))
+        
+        # Resize observation to match the defined observation space
+        obs = cv2.resize(np.transpose(obs, (1, 2, 0)), (80, 80), interpolation=cv2.INTER_AREA)
+        obs = np.transpose(obs, (2, 0, 1))
+        obs = np.expand_dims(obs, axis=0).astype(np.float32)
+        
         return obs
+    
+    # def extract_features(self, obs):
+    #     obs_resized = cv2.resize(obs, (80, 80))
 
-    def extract_features(self, obs):
-        obs_tensor = th.from_numpy(obs).float().permute(2, 0, 1).unsqueeze(0) / 255.0
-        with th.no_grad():
-            features = self.feature_extractor(obs_tensor)
-        features_np = features.squeeze().numpy()
-        return np.clip(features_np, -1, 1)
+    #     obs_tensor = np.transpose(obs_resized, (2, 0, 1))
+    #     obs_tensor = np.expand_dims(obs_tensor, axis=0)
+
+    #     obs_tensor = obs_tensor.astype(np.float32) / 255.0
+
+    #     return obs_tensor
 
     def plan_path(self, init, target):
-        obs = self.generate_observation()
-        Observation = self.extract_features(obs)
+        Observation = self._get_obs()
 
         start = (int(init[0]/self.scale_factor_waypoint_w), int(init[2]/self.scale_factor_waypoint_h))
         goal = (int(target[0]/self.scale_factor_waypoint_w), int(target[2]/self.scale_factor_waypoint_h))
 
+        start_z = init[1]
+        goal_z = target[1]
+
         ort_session = ort.InferenceSession(self.onnx_path)
-        action = ort_session.run(None, {"input": np.array([Observation])})
+        action = ort_session.run(None, {"observation": Observation})
         action = np.clip(action, -1, 1)
 
         direction_vector = np.array(goal) - np.array(start)
@@ -281,11 +182,14 @@ class PathPlanning:
         cnn_real_path = np.array(cnn_real_path)
 
         # Calculate z values based on heightmap
-        path_z = np.array([self.heightmap_resized[int(point[0]), int(point[1])] for point in cnn_real_path])
+        #path_z = np.array([self.heightmap_resized[int(point[0]), int(point[1])] for point in cnn_real_path])
+        agent1_path_z = np.array([self.heightmap_resized[int(point[0]), int(point[1])] for point in agent1_path]) + self.z_factor
+        path_z = np.insert(agent1_path_z, 0, start_z)
+        path_z = np.append(path_z, goal_z)
         path_z = np.float64(path_z)
 
         # Apply z_factor
-        path_z = path_z + self.z_factor
+        # path_z = path_z + self.z_factor
 
         self.path_x = cnn_real_path[:, 0] * self.scale_factor_waypoint_w
         self.path_y = cnn_real_path[:, 1] * self.scale_factor_waypoint_h
@@ -799,7 +703,7 @@ class PathPlanningServer(Node):  # topic 이름과 message 타입은 서로 매�
         # added by controller
         # file path
         self.image_path = '/home/user/workspace/ros2/ros2_ws/src/pathplanning/pathplanning/map/512-001.png'
-        self.model_path = "/home/user/workspace/ros2/ros2_ws/src/pathplanning/pathplanning/model/sac_pp_100000.onnx"
+        self.model_path = "/home/user/workspace/ros2/ros2_ws/src/pathplanning/pathplanning/model/sac_model_85000.onnx"
 
         # path plannig complete flag
         self.path_plannig_start = False  # flag whether path planning start
@@ -831,9 +735,9 @@ class PathPlanningServer(Node):  # topic 이름과 message 타입은 서로 매�
         # declare heartbeat_publisher
         self.heartbeat_publisher = self.create_publisher(Heartbeat, '/path_planning_heartbeat', 10)
 
-        self.get_logger().info("                                          ")
-        self.get_logger().info("===== Path Planning Node is Running  =====")
-        self.get_logger().info("                                          ")
+        print("                                          ")
+        print("===== Path Planning Node is Running  =====")
+        print("                                          ")
 
         # declare heartbeat_timer
         period_heartbeat_mode = 1
@@ -848,13 +752,13 @@ class PathPlanningServer(Node):  # topic 이름과 message 타입은 서로 매�
     def local_waypoint_publish(self):
         msg = LocalWaypointSetpoint()
         msg.path_planning_complete = self.path_planning_complete
-        msg.waypoint_x = self.waypoint_x
-        msg.waypoint_y = self.waypoint_y
-        msg.waypoint_z = self.waypoint_z
+        msg.waypoint_x = self.waypoint_y
+        msg.waypoint_y = self.waypoint_x
+        msg.waypoint_z = [x * 0.1 for x in self.waypoint_z]
         self.local_waypoint_publisher.publish(msg)
-        self.get_logger().info("                                          ")
-        self.get_logger().info("==  Sended local waypoint to controller ==")
-        self.get_logger().info("                                          ")
+        print("                                          ")
+        print("==  Sended local waypoint to controller ==")
+        print("                                          ")
 
     # heartbeat check function
     # heartbeat publish
@@ -882,16 +786,14 @@ class PathPlanningServer(Node):  # topic 이름과 message 타입은 서로 매�
     def global_waypoint_callback(self, msg):
         # check heartbeat
         if self.controller_heartbeat and self.path_following_heartbeat and self.collision_avoidance_heartbeat:
-
-            if not self.path_plannig_start and not self.path_planning_complete:
-
+            if not self.path_plannig_start and not self.path_planning_complete: 
                 self.Init_custom = msg.start_point
                 self.Target_custom = msg.goal_point
                 self.path_plannig_start = True
 
-                self.get_logger().info("                                          ")
-                self.get_logger().info("===== Received Path Planning Request =====")
-                self.get_logger().info("                                          ")
+                print("                                          ")
+                print("===== Received Path Planning Request =====")
+                print("                                          ")
 
                 if self.mode == 1 and not self.path_planning_complete:
                     # start path planning
