@@ -4,6 +4,7 @@ import airsim
 import numpy as np
 from cv_bridge import CvBridge
 from functools import partial
+import time
 
 def main():
     # Initialize ROS node
@@ -11,10 +12,10 @@ def main():
 
     # Create a ROS 2 node
     node = rclpy.create_node('image_pub_depth')
+    node.client = None
 
     # Initialize AirSim client
-    client = airsim.CarClient()
-    client.confirmConnection()
+    connect_to_airsim(node)
 
     # Create a publisher for the depth image
     left_img_pub = node.create_publisher(Image, 'depth/raw', 10)
@@ -25,7 +26,7 @@ def main():
     # Create a rate object for publishing frequency
     rate = 30.0  # 30 Hz
     timer_period = 1.0 / rate
-    timer_callback = partial(publish_depth_image, client, left_img_pub, bridge_d)
+    timer_callback = partial(publish_depth_image, node.client, left_img_pub, bridge_d)
     timer = node.create_timer(timer_period, timer_callback)
 
     rclpy.spin(node)
@@ -33,6 +34,17 @@ def main():
     # Clean up when the node is destroyed
     node.destroy_node()
     rclpy.shutdown()
+
+def connect_to_airsim(self):
+    while True:
+        try:
+            self.client = airsim.CarClient()
+            self.client.confirmConnection()
+            self.get_logger().info('Connected to AirSim server.')
+            break  # 연결이 성공하면 루프 종료
+        except Exception as e:
+            self.get_logger().warn(f'Connection failed: {e}. Retrying in 2 seconds...')
+            time.sleep(2)  # 2초 대기 후 다시 시도
 
 def publish_depth_image(client, left_img_pub, bridge_d):
     # Capture depth image from AirSim
