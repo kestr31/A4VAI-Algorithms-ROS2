@@ -20,6 +20,13 @@ class PathPlanningTest(Node):
     def __init__(self):
         super().__init__("give_global_waypoint")
 
+        ############################################################################################################
+        # input: start_point, goal_point
+        # set start and goal point
+        self.start_point = [0.0, 5.0, 0.0]
+        self.goal_point = [950.0, 15.0, 950.0]
+        ############################################################################################################
+
         # Publisher for global waypoint setpoint
         self.global_waypoint_publisher = self.create_publisher(
             GlobalWaypointSetpoint, 
@@ -35,11 +42,7 @@ class PathPlanningTest(Node):
             10,
         )
 
-        # set initial value
 
-        # set start and goal point
-        self.start_point = [0.0, 5.0, 0.0]
-        self.goal_point = [950.0, 15.0, 950.0]
 
         # set waypoint
         self.waypoint_x = []
