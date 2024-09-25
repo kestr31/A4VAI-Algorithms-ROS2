@@ -1,6 +1,6 @@
 import rclpy
 from sensor_msgs.msg import Image
-import airsim
+import cosysairsim as airsim
 import numpy as np
 from cv_bridge import CvBridge
 from functools import partial
@@ -38,8 +38,10 @@ def main():
 def connect_to_airsim(self):
     while True:
         try:
-            self.client = airsim.CarClient()
+            self.client = airsim.MultirotorClient(ip = "172.70.0.4", port = 41451)
             self.client.confirmConnection()
+            self.client.enableApiControl(True)
+            self.client.simSetTraceLine([1.0, 0.0, 0.0, 0.5], thickness=3.0, vehicle_name='')
             self.get_logger().info('Connected to AirSim server.')
             break  # 연결이 성공하면 루프 종료
         except Exception as e:
