@@ -42,7 +42,7 @@ class JBNU_Collision(Node):
         self.sess = rt.InferenceSession(model_pretrained.SerializeToString(), providers=['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider'])
         self.output_name = self.sess.get_outputs()[0].name
         self.input_name = self.sess.get_inputs()[0].name
-        self.subscription = self.create_subscription(Image, '/depth/raw', self.depth_sub, 1)
+        self.subscription = self.create_subscription(Image, '/airsim_node/SimpleFlight/Depth_Camera_DepthPerspective/image', self.depth_sub, 1)
 
 
         # self.CameraSubscriber_ = self.create_subscription(Image, '/airsim_node/Typhoon_1/DptCamera/DepthPerspective', self.depth_sub, QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT))
@@ -72,8 +72,8 @@ class JBNU_Collision(Node):
                 vyaw = infer[3] * 1.0
 
                 cmd = Twist()
-                cmd.linear.x = float(vx)
-                cmd.linear.y = float(vy)
+                cmd.linear.x = float(vx) * 2.0
+                cmd.linear.y = float(vy) * 2.0
                 cmd.linear.z = float(vz)
                 cmd.angular.z = vyaw * 2.0
                 self.publisher_cmd.publish(cmd)
@@ -90,23 +90,27 @@ class JBNU_Collision(Node):
         except Exception as e:
             self.get_logger().error(f"Error converting Image message: {e}")
             return
+        
+        valid_image = np.ones(image.shape)*12.0
+        
+        valid_mask = (image <= 12)
+
+        valid_image[valid_mask] = image[valid_mask]
 
         # Your preprocessing steps here
-        # image = np.interp(image, (0, 10.0), (0, 255))
+        image = np.interp(image, (0, 6.0), (0, 255))
         
-        valid_mask = image < 100
 
-        valid_depths = image[valid_mask]
+        # scaled_depths = np.interp(valid_depths, (valid_depths.min(), valid_depths.max()), (0, 255))
 
-        scaled_depths = np.interp(valid_depths, (valid_depths.min(), valid_depths.max()), (0, 255))
-
-        output_image = np.full(image.shape, 255, dtype=np.uint8)
+        # output_image = np.full(image.shape, 255, dtype=np.uint8)
             
-        output_image[valid_mask] = scaled_depths.astype(np.uint8)
-        image = preprocess(output_image)
+        # output_image[valid_mask] = scaled_depths.astype(np.uint8)
 
-        # cv2.imshow('walid', image.astype(np.uint8))
-        # cv2.waitKey(0)
+        image = preprocess(image)
+
+        cv2.imshow('walid', image.astype(np.uint8))
+        cv2.waitKey(1)
 
         image = np.array([image])  # The model expects a 4D array
         self.image = image.astype(np.float32)
