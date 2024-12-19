@@ -35,7 +35,7 @@ class JBNU_Collision(Node):
         self.controller_heartbeat_subscriber            =   self.create_subscription(Bool, '/controller_heartbeat',            self.controller_heartbeat_call_back,            10)
         self.path_following_heartbeat_subscriber        =   self.create_subscription(Bool, '/path_following_heartbeat',        self.path_following_heartbeat_call_back,        10)
         self.path_planning_heartbeat_subscriber         =   self.create_subscription(Bool, '/path_planning_heartbeat',         self.path_planning_heartbeat_call_back,         10)
-
+        self.pub = self.create_publisher(Image, '/image4', 1)
 
         self.image = []
 #############################################################################################################
@@ -94,14 +94,13 @@ class JBNU_Collision(Node):
         
         valid_image = np.ones(image.shape)*12.0
         
-        valid_mask = (image <= 12)
+        valid_mask = (image <= 12) & (image > 0.3)
 
         valid_image[valid_mask] = image[valid_mask]
 
         # Your preprocessing steps here
-        image = np.interp(image, (0, 6.0), (0, 255))
-        
-
+        image = np.interp(image, (0, 12.0), (0, 255))
+        self.publish_image4(image)
         # scaled_depths = np.interp(valid_depths, (valid_depths.min(), valid_depths.max()), (0, 255))
 
         # output_image = np.full(image.shape, 255, dtype=np.uint8)
@@ -112,6 +111,22 @@ class JBNU_Collision(Node):
 
         image = np.array([image])  # The model expects a 4D array
         self.image = image.astype(np.float32)
+
+
+    def publish_image4(self, image):
+        msg = Image()
+
+        msg.header.frame_id = 'depth_image'
+        msg.header.stamp = rclpy.time.Time().to_msg()
+        msg.height = image.shape[0]
+        msg.width = image.shape[1]
+        msg.encoding = "32FC1"
+        msg.is_bigendian = 0
+        msg.step = image.shape[1] * 4
+
+        # Convert and publish the message
+        msg.data = image.tobytes()
+        self.pub.publish(msg)
 
 # heartbeat check function
     # heartbeat publish

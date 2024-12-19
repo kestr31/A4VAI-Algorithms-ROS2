@@ -4,10 +4,97 @@
 import pandas as pd
 import numpy as np
 import math
+import os
+from datetime import datetime, timedelta
+
+from .data_class import *
+
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
+from rclpy.clock import Clock
 
 # endregion
 # ----------------------------------------------------------------------------------------#
 
+
+
+def state_logger(self):
+    flightlog = "%f %f %f %f %f %f %f %f %f %f %f %f\n" % (
+        int(Clock().now().nanoseconds / 1000),
+        self.state_var.x,
+        self.state_var.y,
+        self.state_var.z,
+        # ned velocity [m/s]
+        self.state_var.vx,
+        self.state_var.vy,
+        self.state_var.vz,
+        # attitude [rad]
+        self.state_var.roll,
+        self.state_var.pitch,
+        self.state_var.yaw,
+
+        self.guid_var.cur_wp,
+        self.guid_var.waypoint_x[0]
+        # self.guid_var.waypoint_y,
+        # self.guid_var.waypoint_z,
+        
+
+    )
+    self.sim_var.flight_log.write(flightlog)
+
+def set_initial_variables(classIn, dir, sim_name):
+    
+    classIn.state_var      = StateVariable()
+    classIn.offboard_var   = OffboardVariable()
+    classIn.guid_var       = GuidVariable()
+    classIn.mode_flag      = ModeFlag()
+    classIn.offboard_mode  = OffboardControlModeState()
+    classIn.modes          = VehicleModes()
+    classIn.veh_att_set    = VehicleAttitudeSetpointState()
+    classIn.veh_vel_set    = VehicleVelocitySetpointState()
+    classIn.ca_var         = CollisionAvoidanceVariable()
+    classIn.sim_var        = SimulationVariable(sim_name, dir)
+
+    classIn.qos_profile_px4 = QoSProfile(
+        reliability=ReliabilityPolicy.BEST_EFFORT,
+        durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        history=HistoryPolicy.KEEP_LAST,
+        depth=1
+    )
+
+    classIn.qos_profile_lidar = QoSProfile(
+        reliability=ReliabilityPolicy.BEST_EFFORT,
+        depth=10
+    )
+
+    set_wp(classIn)
+    set_logging_file(classIn)
+
+def set_wp(self):
+
+    wp_path = os.path.join(self.sim_var.dir, "wp.csv")
+    data = pd.read_csv(wp_path)
+
+    self.guid_var.waypoint_x = list(data["x"][1:])
+    self.guid_var.waypoint_y = list(data["y"][1:])
+    self.guid_var.waypoint_z = list(data["z"][1:])
+    
+    self.guid_var.real_wp_x = list(data["x"])
+    self.guid_var.real_wp_y = list(data["y"])
+    self.guid_var.real_wp_z = list(data["z"])
+
+def set_logging_file(self):
+    # file name like 20241216_225040_path_following.csv
+    current_time = datetime.now() + timedelta(hours=9)
+    log_file_name = current_time.strftime("%Y%m%d_%H%M%S_") + self.sim_var.sim_name + ".csv"
+    log_path = os.path.join((self.sim_var.dir + '/log'), log_file_name)
+    self.sim_var.flight_log = open(log_path, "w")
+
+def publish_to_plotter(self):
+    self.pub_func_plotter.publish_global_waypoint_to_plotter(self.guid_var)
+    self.pub_func_plotter.publish_local_waypoint_to_plotter(self.guid_var)
+    self.pub_func_plotter.publish_obstacle_min_distance(self.ca_var)
+    self.pub_func_plotter.publish_heading(self.state_var)
+    self.pub_func_plotter.publish_control_mode(self.mode_flag)
 
 def set_waypoint():
     waypoint = pd.read_csv("waypoint.csv")
@@ -32,15 +119,8 @@ def convert_quaternion2euler(w, x, y, z):
     return Roll, Pitch, Yaw
 
 # convert Body frame to NED frame
-def BodytoNED(vx_body_cmd, vy_body_cmd, vz_body_cmd, dcm):
-    vel_cmd_body = np.array(
-        [
-            vx_body_cmd,
-            vy_body_cmd,
-            vz_body_cmd,
-        ]
-    )
-    vel_ned_cmd = np.array((dcm @ vel_cmd_body).tolist())
+def BodytoNED(vel_body_cmd, dcm):
+    vel_ned_cmd = np.array((dcm @ vel_body_cmd).tolist())
     return vel_ned_cmd
 
 # convert NED frame to Body frame

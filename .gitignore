@@ -12,11 +12,11 @@ pub_depth/pub_depth/__pycache__
 plotter/plotter/__pycache__
 algorithm_test/algorithm_test/__pycache__
 algorithm_test/algorithm_test/collosion_avoidance_unit_test/__pycache__
+algorithm_test/algorithm_test/ca_pf_integrated_test/log.csv
+algorithm_test/algorithm_test/ca_pf_integrated_test/__pycache__
+algorithm_test/algorithm_test/path_following_unit_test/__pycache__
+algorithm_test/algorithm_test/path_following_unit_test/log.csv
 algorithm_test/algorithm_test/lib/__pycache__
-
-algorithm_test/algorithm_test/collosion_avoidance_unit_test/log.txt
-algorithm_test/algorithm_test/collosion_avoidance_unit_test/sample1.csv
-
 # result images
 pathplanning/pathplanning/Results_Images/SSAC_Result_biary.png
 pathplanning/pathplanning/Results_Images/SAC_Result_og.pn

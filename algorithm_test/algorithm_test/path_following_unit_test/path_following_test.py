@@ -8,12 +8,11 @@ import os
 import rclpy
 from rclpy.node import Node
 
-from ..lib.common_fuctions import set_initial_variables, state_logger, publish_to_plotter, set_wp
+from ..lib.common_fuctions import set_initial_variables, state_logger, publish_to_plotter
 from ..lib.publish_function import PubFuncHeartbeat, PubFuncPX4, PubFuncWaypoint, PubFuncPlotter
 from ..lib.timer import HeartbeatTimer, MainTimer, CommandPubTimer
-from ..lib.subscriber import PX4Subscriber, FlagSubscriber, CmdSubscriber
+from ..lib.subscriber import PX4Subscriber, FlagSubscriber, CmdSubscriber, EtcSubscriber
 from ..lib.publisher import PX4Publisher, HeartbeatPublisher, WaypointPublisher, PlotterPublisher
-from ..lib.test import read_wp_csv
 
 class PathFollowingTest(Node):
     def __init__(self):
@@ -25,6 +24,10 @@ class PathFollowingTest(Node):
         set_initial_variables(self, dir, sim_name)
         
         self.offboard_mode.attitude = True
+
+        # test mode 
+        # 1 : normal, 2 : wp change
+        self.test_mode = 2
         # endregion
         # ----------------------------------------------------------------------------------------#
         # region PUBLISHERS
@@ -50,15 +53,18 @@ class PathFollowingTest(Node):
         # end region
         # ----------------------------------------------------------------------------------------#
         # region SUBSCRIBERS
-        self.sub_px4        = PX4Subscriber(self)
+        self.sub_px4 = PX4Subscriber(self)
         self.sub_px4.declareVehicleLocalPositionSubscriber(self.state_var)
 
-        self.sub_cmd        = CmdSubscriber(self)
+        self.sub_cmd = CmdSubscriber(self)
         self.sub_cmd.declarePFAttitudeSetpointSubscriber(self.veh_att_set)
 
-        self.sub_flag       = FlagSubscriber(self)
+        self.sub_flag = FlagSubscriber(self)
         self.sub_flag.declareConveyLocalWaypointCompleteSubscriber(self.mode_flag)
         self.sub_flag.declarePFCompleteSubscriber(self.mode_flag)
+
+        self.sub_etc = EtcSubscriber(self)
+        self.sub_etc.declareHeadingWPIdxSubscriber(self.guid_var)
         # endregion
         # ----------------------------------------------------------------------------------------#
         # region PUB FUNC
@@ -102,7 +108,7 @@ class PathFollowingTest(Node):
 
         # if the vehicle was taken off send local waypoint to path following and wait in position mode
         if self.mode_flag.is_takeoff == True and self.mode_flag.pf_recieved_lw == False:
-            self.pub_func_waypoint.local_waypoint_publish(self.local_waypoint_publisher)
+            self.pub_func_waypoint.local_waypoint_publish(True)
             self.pub_func_px4.publish_vehicle_command(self.modes.prm_position_mode)
             publish_to_plotter(self)
             

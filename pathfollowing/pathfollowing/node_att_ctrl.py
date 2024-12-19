@@ -1,6 +1,8 @@
 #.. public libaries
 import numpy as np
 import math as m
+import os
+import time
 
 #===================================================================================================================
 #.. ROS libraries
@@ -10,6 +12,8 @@ from rclpy.clock  import Clock
 from rclpy.qos    import qos_profile_sensor_data
 from std_msgs.msg import Float64MultiArray
 from std_msgs.msg import Int32MultiArray
+from std_msgs.msg import Bool
+from std_msgs.msg import Int32
 
 #===================================================================================================================
 #.. PX4 libararies - sub.
@@ -39,7 +43,11 @@ class NodeAttCtrl(Node):
     
     def __init__(self):
         super().__init__('node_attitude_control')
-        
+
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        log_path = os.path.join(current_dir, "log.csv")
+        self.flightlogFile = open(log_path, "w")
+
         #.. simulation settings
         self.guid_type_case      =   3       # | 0: Pos. Ctrl     | 1: GL-based  | 2: MPPI-direct | 3: MPPI-GL
         self.wp_type_selection   =   4       # | 0: straight line | 1: rectangle | 2: circle      | 3: designed | 4: path planning solution
@@ -97,12 +105,12 @@ class NodeAttCtrl(Node):
         ###.. Subscribers ..###
 
         # declare heartbeat_subscriber 
-        self.controller_heartbeat_subscriber            =   self.create_subscription(Heartbeat, '/controller_heartbeat',            self.controller_heartbeat_call_back,            10)
-        self.path_planning_heartbeat_subscriber         =   self.create_subscription(Heartbeat, '/path_planning_heartbeat',         self.path_planning_heartbeat_call_back,        10)
-        self.collision_avoidance_heartbeat_subscriber   =   self.create_subscription(Heartbeat, '/collision_avoidance_heartbeat',   self.collision_avoidance_heartbeat_call_back,   10)
+        self.controller_heartbeat_subscriber            =   self.create_subscription(Bool, '/controller_heartbeat',            self.controller_heartbeat_call_back,            10)
+        self.path_planning_heartbeat_subscriber         =   self.create_subscription(Bool, '/path_planning_heartbeat',         self.path_planning_heartbeat_call_back,        10)
+        self.collision_avoidance_heartbeat_subscriber   =   self.create_subscription(Bool, '/collision_avoidance_heartbeat',   self.collision_avoidance_heartbeat_call_back,   10)
 
         #.. subscriptions - from px4 msgs to ROS2 msgs
-        self.local_waypoint_subscriber                  =   self.create_subscription(LocalWaypointSetpoint, '/local_waypoint_setpoint_to_PF',self.local_waypoint_setpoint_call_back, 10) 
+        self.local_waypoint_subscriber                  =   self.create_subscription(LocalWaypointSetpoint, '/local_waypoint_setpoint_to_PF',self.local_waypoint_setpoint_call_back, 1) 
         self.vehicle_local_position_subscriber          =   self.create_subscription(VehicleLocalPosition,    '/fmu/out/vehicle_local_position',   self.vehicle_local_position_callback,   qos_profile_sensor_data)
         self.vehicle_attitude_subscriber                =   self.create_subscription(VehicleAttitude,         '/fmu/out/vehicle_attitude',         self.vehicle_attitude_callback,         qos_profile_sensor_data)
         self.vehicle_acceleration_subscription          =   self.create_subscription(VehicleAcceleration, '/fmu/out/vehicle_acceleration', self.subscript_vehicle_acceleration, qos_profile_sensor_data)      
@@ -115,7 +123,9 @@ class NodeAttCtrl(Node):
 
         self.vehicle_attitude_setpoint_publisher        =   self.create_publisher(VehicleAttitudeSetpoint,   '/pf_att_2_control', 10)
         self.local_waypoint_receive_complete_publisher  =   self.create_publisher(ConveyLocalWaypointComplete, '/convey_local_waypoint_complete', 10) 
-        self.heartbeat_publisher                        =   self.create_publisher(Heartbeat,    '/path_following_heartbeat', 10)
+        self.heading_wp_idx_publisher                   =   self.create_publisher(Int32, '/heading_waypoint_index', 1)
+        self.heartbeat_publisher                        =   self.create_publisher(Bool, '/path_following_heartbeat', 10)
+        self.pf_complete_publisher                      =   self.create_publisher(Bool, '/path_following_complete', 1)
 
         if self.guid_type_case >= 3:
             #.. publishers - from ROS2 msgs to ROS2 msgs
@@ -150,26 +160,36 @@ class NodeAttCtrl(Node):
     
     # heartbeat subscribe from controller
     def controller_heartbeat_call_back(self,msg):
-        self.controller_heartbeat = msg.heartbeat
+        self.controller_heartbeat = msg.data
 
     # heartbeat subscribe from path following
     def path_planning_heartbeat_call_back(self,msg):
-        self.path_planning_heartbeat = msg.heartbeat
+        self.path_planning_heartbeat = msg.data
 
     # heartbeat subscribe from collision avoidance
     def collision_avoidance_heartbeat_call_back(self,msg):
-        self.collision_avoidance_heartbeat = msg.heartbeat
+        self.collision_avoidance_heartbeat = msg.data
 
     # receive local waypoint from controller
     def local_waypoint_setpoint_call_back(self,msg):
-        self.path_planning_complete = msg.path_planning_complete
-        self.WP.waypoint_x             = msg.waypoint_x 
-        self.WP.waypoint_y             = msg.waypoint_y
-        self.WP.waypoint_z             = msg.waypoint_z
-        print("                                          ")
-        print("== receiving local waypoint complete!   ==")
-        print("                                          ")
-        self.local_waypoint_receive_complete_publish()
+        self.get_logger().info("msg.path_planning_complete: {0}".format(msg.path_planning_complete))
+        
+        if msg.path_planning_complete == True:
+            self.path_planning_complete = True
+            self.WP.waypoint_x             = msg.waypoint_x 
+            self.WP.waypoint_y             = msg.waypoint_y
+            self.WP.waypoint_z             = msg.waypoint_z
+
+            # self.get_logger().info("                                          ")
+            # self.get_logger().info("=====    revieved Path Planning      =====")
+            # self.get_logger().info("                                          ")
+            self.local_waypoint_receive_complete_publish()
+        elif msg.path_planning_complete == False:
+            self.QR.PF_var.reWP_flag = 1
+            self.WP.reWPs = np.array([msg.waypoint_x, msg.waypoint_y, msg.waypoint_z]).T
+            # print("                                          ")
+            # print("==             updated waypoints        ==")
+            # print("                                          ")
 
     # subscribe position, velocity 
     def vehicle_local_position_callback(self, msg):
@@ -241,11 +261,25 @@ class NodeAttCtrl(Node):
         msg.convey_local_waypoint_is_complete = True
         self.local_waypoint_receive_complete_publisher.publish(msg)
 
+    def heading_wp_idx_publish(self):
+        msg = Int32()
+        msg.data = self.QR.PF_var.WP_idx_heading
+        # self.get_logger().info('heading_wp_index: {0}'.format(self.QR.PF_var.WP_idx_heading))
+        # self.get_logger().info('heading_wp_position: {0}'.format(self.WP.WPs[self.QR.PF_var.WP_idx_heading]))
+        # self.get_logger().info('heading_wp_position: {0}'.format(self.WP.WPs))
+        self.heading_wp_idx_publisher.publish(msg)
+        
     # heartbeat publish
     def publish_heartbeat(self):
-        msg = Heartbeat()
-        msg.heartbeat = True
+        msg = Bool()
+        msg.data = True
         self.heartbeat_publisher.publish(msg)
+
+    # send path following complete flag
+    def publish_pf_complete(self):
+        msg = Bool()
+        msg.data = self.QR.PF_var.PF_done
+        self.pf_complete_publisher.publish(msg)
 
     #.. publish_MPPI_input_int_Q6
     def publish_MPPI_input_int_Q6(self):
@@ -321,8 +355,8 @@ class NodeAttCtrl(Node):
                  # waypoint settings                     
                 self.WP.set_values(self.wp_type_selection, self.WP.waypoint_x, self.WP.waypoint_y, self.WP.waypoint_z)
 
+                # self.WP.insert_WP(0, np.array([self.QR.state_var.Ri[0], self.QR.state_var.Ri[1], -self.WP.waypoint_z[self.QR.PF_var.WP_idx_heading]-2]))
                 self.WP.insert_WP(0, self.QR.state_var.Ri)
-                
                 # var for waypoint regeneration test
                 self.count_stop = 0
 
@@ -352,20 +386,26 @@ class NodeAttCtrl(Node):
                     self.WP.WPs                   = self.WP.reWPs
                     self.QR.PF_var.WP_idx_heading = 1
                     self.QR.PF_var.WP_idx_passed  = 0
-                    self.WP.insert_WP(0, self.QR.state_var.Ri)   
-                    self.WP.insert_WP(0, self.QR.state_var.Ri)     
+                    # self.WP.insert_WP(0, np.array([self.QR.state_var.Ri[0], self.QR.state_var.Ri[1], -self.WP.waypoint_z[self.QR.PF_var.WP_idx_heading]-2]))
+                    self.WP.insert_WP(0, self.QR.state_var.Ri)
+                    
+                    # self.WP.insert_WP(0, self.QR.state_var.Ri)
+
                     
                 #.. state variables updates (from px4)
                 self.QR.update_states(self.est_state.pos_NED, self.est_state.vel_NED, self.est_state.eul_ang_rad, self.est_state.accel_xyz)
                 
                 #.. path following required information
                 self.QR.PF_required_info(self.WP.WPs, self.sim_time, self.QR.GnC_param.dt_GCU)
+                self.heading_wp_idx_publish()
+                if self.QR.PF_var.PF_done == True:
+                    self.publish_pf_complete()
 
                 #.. guidance                
                 self.QR.guid_Ai_cmd(self.WP.WPs.shape[0], self.QR.guid_var.MPPI_ctrl_input)  # based on the geometry and VT     
                 self.QR.guid_compensate_Ai_cmd()                                             # gravity, disturbance rejection
                 self.QR.guid_NDO_for_Ai_cmd()                                                # NDO for disturbance estimation
-                self.QR.guid_convert_Ai_cmd_to_thrust_and_att_ang_cmd(self.WP.WPs)
+                self.QR.guid_convert_Ai_cmd_to_thrust_and_att_ang_cmd(self.WP.WPs, self.flightlogFile)
                 self.QR.guid_convert_att_ang_cmd_to_qd_cmd()
                 
                 #.. guidance command

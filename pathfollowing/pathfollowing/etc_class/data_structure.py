@@ -74,6 +74,7 @@ class Path_Following_Var():
         self.VT_Ri                       =   np.array([0., 0., 0.])
         self.WP_idx_passed               =   0
         self.WP_idx_heading              =   1
+        self.PF_done                     =   False
         self.WP_manual                   =   0
         self.reWP_flag                   =   0 #20240914 diy
         self.stop_flag                   =   0
