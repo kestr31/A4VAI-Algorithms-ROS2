@@ -3,7 +3,6 @@ from px4_msgs.msg import OffboardControlMode
 from px4_msgs.msg import VehicleAttitudeSetpoint
 from px4_msgs.msg import TrajectorySetpoint
 
-from custom_msgs.msg import Heartbeat
 from custom_msgs.msg import LocalWaypointSetpoint
 from custom_msgs.msg import GlobalWaypointSetpoint
 

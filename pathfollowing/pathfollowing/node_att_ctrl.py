@@ -29,7 +29,6 @@ from px4_msgs.msg import VehicleAttitudeSetpoint
 #.. Custom msgs
 from custom_msgs.msg import LocalWaypointSetpoint            # sub.
 from custom_msgs.msg import ConveyLocalWaypointComplete      # pub. 
-from custom_msgs.msg import Heartbeat                        # pub. & sub. 
 
 #===================================================================================================================
 #.. private libs.

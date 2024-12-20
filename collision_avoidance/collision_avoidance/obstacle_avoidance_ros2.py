@@ -17,7 +17,6 @@ from rclpy.qos import QoSReliabilityPolicy
 from rclpy.qos import qos_profile_sensor_data
 #############################################################################################################
 # added by controller
-from custom_msgs.msg import Heartbeat
 #############################################################################################################
 class JBNU_Collision(Node):
     def __init__(self):
