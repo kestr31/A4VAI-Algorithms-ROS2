@@ -43,7 +43,6 @@ def check_waypoint(WP_WPs, QR_WP_idx_heading, QR_Ri, QR_distance_change_WP):
     # mag_Rqw2i   =   np.linalg.norm(Rqw2i)
 
     PF_done     =   False
-    print('mag_Rqw2i:', mag_Rqw2i)
     if mag_Rqw2i < QR_distance_change_WP:
         QR_WP_idx_heading = QR_WP_idx_heading + 1
         if QR_WP_idx_heading == WP_WPs.shape[0]:
@@ -65,9 +64,7 @@ def VTP_decision(dist_to_path, QR_virtual_target_distance, QR_point_closest_on_p
             mag_Rp1p2   =   np.linalg.norm(Rp1p2)
             if total_len + mag_Rp1p2 > QR_virtual_target_distance:
                 mag_Rp1t    =   QR_virtual_target_distance - total_len
-                VT_Ri       =   [p1[0] + mag_Rp1t * Rp1p2[0]/max(mag_Rp1p2,0.001), 
-                                p1[1] + mag_Rp1t * Rp1p2[1]/max(mag_Rp1p2,0.001), 
-                                p1[2] - mag_Rp1t * Rp1p2[2]/max(mag_Rp1p2,0.001)]
+                VT_Ri       =   p1 + mag_Rp1t * Rp1p2[0]/max(mag_Rp1p2,0.001)
                 break
             else:
                 p1  =   p2
