@@ -120,7 +120,7 @@ def convert_Ai_cmd_to_thrust_and_att_ang_cmd(cI_B, Ai_cmd, mass, T_max, WP_WPs, 
     # thrust cmd
     mag_Ai_cmd  = np.linalg.norm(Ai_cmd)
     Ab_cmd      = np.matmul(cI_B, Ai_cmd)
-    T_cmd       = min(abs(Ab_cmd[2]) * mass, T_max)
+    T_cmd       = min(abs(mag_Ai_cmd) * mass, T_max)
     norm_T_cmd  = T_cmd / T_max
 
     if WP_idx_heading == 0:
@@ -185,47 +185,45 @@ def convert_Ai_cmd_to_thrust_and_att_ang_cmd(cI_B, Ai_cmd, mass, T_max, WP_WPs, 
     return T_cmd, norm_T_cmd, att_ang_cmd
 
 
-
-
 #.. prev_convert_Ai_cmd_to_thrust_and_att_ang_cmd
-# def convert_Ai_cmd_to_thrust_and_att_ang_cmd(cI_B, Ai_cmd, mass, T_max, WP_WPs, WP_idx_heading, Ri, att_ang, del_psi_cmd_limit):    
-#     # thrust cmd
-#     mag_Ai_cmd  = np.linalg.norm(Ai_cmd)
-#     Ab_cmd      = np.matmul(cI_B, Ai_cmd)
-#     T_cmd       = min(abs(Ab_cmd[2]) * mass, T_max)
-#     norm_T_cmd  = T_cmd / T_max
+def convert_Ai_cmd_to_thrust_and_att_ang_cmd(cI_B, Ai_cmd, mass, T_max, WP_WPs, WP_idx_heading, Ri, att_ang, del_psi_cmd_limit):    
+    # thrust cmd
+    mag_Ai_cmd  = np.linalg.norm(Ai_cmd)
+    Ab_cmd      = np.matmul(cI_B, Ai_cmd)
+    T_cmd       = min(abs(Ab_cmd[2]) * mass, T_max)
+    norm_T_cmd  = T_cmd / T_max
 
-#     # attitude angle cmd
-#     WP_heading  =   WP_WPs[WP_idx_heading]
-#     Rqwi        =   WP_heading - Ri
-#     if WP_idx_heading < WP_WPs.shape[0]-1:
-#         psi_des, _  =   azim_elev_from_vec3(Rqwi)       # toward to the heading waypoint
-#     else:
-#         WP_idx_passed = max(WP_idx_heading - 1, 0)
-#         WP_passed   =   WP_WPs[WP_idx_passed]
-#         WP12        =   WP_heading - WP_passed
-#         psi_des, _  =   azim_elev_from_vec3(WP12)
+    # attitude angle cmd
+    WP_heading  =   WP_WPs[WP_idx_heading]
+    Rqwi        =   WP_heading - Ri
+    if WP_idx_heading < WP_WPs.shape[0]-1:
+        psi_des, _  =   azim_elev_from_vec3(Rqwi)       # toward to the heading waypoint
+    else:
+        WP_idx_passed = max(WP_idx_heading - 1, 0)
+        WP_passed   =   WP_WPs[WP_idx_passed]
+        WP12        =   WP_heading - WP_passed
+        psi_des, _  =   azim_elev_from_vec3(WP12)
         
-#     # att_ang_cmd -  del_psi_cmd limitation
-#     del_psi     =   psi_des - att_ang[2]
-#     if abs(del_psi) > 1.0*m.pi:
-#         if psi_des > att_ang[2]:
-#             psi_des = psi_des - 2.*m.pi
-#         else:
-#             psi_des = psi_des + 2.*m.pi
-#     del_psi     =   max(min(psi_des - att_ang[2], del_psi_cmd_limit), -del_psi_cmd_limit)
-#     psi_des     =   att_ang[2] + del_psi
+    # att_ang_cmd -  del_psi_cmd limitation
+    del_psi     =   psi_des - att_ang[2]
+    if abs(del_psi) > 1.0*m.pi:
+        if psi_des > att_ang[2]:
+            psi_des = psi_des - 2.*m.pi
+        else:
+            psi_des = psi_des + 2.*m.pi
+    del_psi     =   max(min(psi_des - att_ang[2], del_psi_cmd_limit), -del_psi_cmd_limit)
+    psi_des     =   att_ang[2] + del_psi
     
-#     euler_psi   =   np.array([0., 0., psi_des])
-#     mat_psi     =   DCM_from_euler_angle(euler_psi)
-#     Apsi_cmd    =   np.matmul(mat_psi , Ai_cmd)
-#     phi         =   m.asin(Apsi_cmd[1]/mag_Ai_cmd)
-#     sintheta    =   min(max(-Apsi_cmd[0]/m.cos(phi)/mag_Ai_cmd, -1.), 1.)
-#     theta       =   m.asin(sintheta)
-#     psi         =   psi_des
+    euler_psi   =   np.array([0., 0., psi_des])
+    mat_psi     =   DCM_from_euler_angle(euler_psi)
+    Apsi_cmd    =   np.matmul(mat_psi , Ai_cmd)
+    phi         =   m.asin(Apsi_cmd[1]/mag_Ai_cmd)
+    sintheta    =   min(max(-Apsi_cmd[0]/m.cos(phi)/mag_Ai_cmd, -1.), 1.)
+    theta       =   m.asin(sintheta)
+    psi         =   psi_des
             
-#     att_ang_cmd = np.array([phi, theta, psi])
-#     return T_cmd, norm_T_cmd, att_ang_cmd
+    att_ang_cmd = np.array([phi, theta, psi])
+    return T_cmd, norm_T_cmd, att_ang_cmd
 
 #.. NDO_for_Ai_cmd
 def NDO_for_Ai_cmd(T_cmd, mass, grav, QR_cI_B, QR_gain_NDO, QR_z_NDO, QR_Vi, QR_dt_GCU, Ai_rotor_drag):

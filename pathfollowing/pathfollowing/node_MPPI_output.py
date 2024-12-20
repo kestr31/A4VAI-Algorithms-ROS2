@@ -141,7 +141,6 @@ class Node_MPPI_Output(Node):
     def publish_MPPI_output(self):
         msg                 =   Float64MultiArray()
         msg.data            =   [self.QR.guid_var.MPPI_ctrl_input[0], self.QR.guid_var.MPPI_ctrl_input[1], self.QR.guid_var.MPPI_ctrl_input[2]]
-        self.get_logger().info('MPPI: {0}'.format(msg.data))
         
         self.MPPI_output_publisher_.publish(msg)
         # self.get_logger().info('mppi: {0}'.format(np.linalg.norm(self.M)))

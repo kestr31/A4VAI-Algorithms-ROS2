@@ -385,10 +385,9 @@ class NodeAttCtrl(Node):
                     # self.WP.WPs                   = self.WP.reWPs
                     self.QR.PF_var.WP_idx_heading = 1
                     self.QR.PF_var.WP_idx_passed  = 0
-                    # self.WP.insert_WP(0, self.QR.state_var.Ri)
-                    # self.WP.insert_WP(0, self.QR.state_var.Ri)
+
                 # self.get_logger().info('self.QR.PF_var.WP_idx_passed: {0}'.format(self.QR.PF_var.WP_idx_passed))
-                self.get_logger().info(str(self.WP.WPs))
+                # self.get_logger().info(str(self.WP.WPs))
                 #.. state variables updates (from px4)
                 self.QR.update_states(self.est_state.pos_NED, self.est_state.vel_NED, self.est_state.eul_ang_rad, self.est_state.accel_xyz)
                 

@@ -128,12 +128,6 @@ def lidar_callback(state_var, guid_var, mode_flag, ca_var, pub_func, pc_msg):
                     guid_var.waypoint_y = list(np.insert(guid_var.waypoint_y, 0, state_var.y))
                     guid_var.waypoint_z = list(np.insert(guid_var.waypoint_z, 0, state_var.z))
                     guid_var.waypoint_z = list(np.insert(guid_var.waypoint_z, 0, state_var.z))
-                    guid_var.waypoint_x = list(np.insert(guid_var.waypoint_x, 0, state_var.x))
-                    guid_var.waypoint_x = list(np.insert(guid_var.waypoint_x, 0, state_var.x))
-                    guid_var.waypoint_y = list(np.insert(guid_var.waypoint_y, 0, state_var.y))
-                    guid_var.waypoint_y = list(np.insert(guid_var.waypoint_y, 0, state_var.y))
-                    guid_var.waypoint_z = list(np.insert(guid_var.waypoint_z, 0, state_var.z))
-                    guid_var.waypoint_z = list(np.insert(guid_var.waypoint_z, 0, state_var.z))
 
                     # print(guid_var.waypoint_x[guid_var.cur_wp:])
                     # print(guid_var.cur_wp)
