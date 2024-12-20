@@ -186,7 +186,8 @@ class NodeAttCtrl(Node):
             self.local_waypoint_receive_complete_publish()
         elif msg.path_planning_complete == False:
             self.QR.PF_var.reWP_flag = 1
-            self.WP.reWPs = np.array([msg.waypoint_x, msg.waypoint_y, msg.waypoint_z]).T
+
+            self.WP.set_values(self.wp_type_selection, msg.waypoint_x, msg.waypoint_y, msg.waypoint_z)
             # print("                                          ")
             # print("==             updated waypoints        ==")
             # print("                                          ")
@@ -355,8 +356,7 @@ class NodeAttCtrl(Node):
                  # waypoint settings                     
                 self.WP.set_values(self.wp_type_selection, self.WP.waypoint_x, self.WP.waypoint_y, self.WP.waypoint_z)
 
-                # self.WP.insert_WP(0, np.array([self.QR.state_var.Ri[0], self.QR.state_var.Ri[1], -self.WP.waypoint_z[self.QR.PF_var.WP_idx_heading]-2]))
-                self.WP.insert_WP(0, self.QR.state_var.Ri)
+                # self.WP.insert_WP(0, self.QR.state_var.Ri)
                 # var for waypoint regeneration test
                 self.count_stop = 0
 
@@ -371,7 +371,7 @@ class NodeAttCtrl(Node):
                 # For test------------------------------------------                
                 # 20240914 diy
                 # self.count_stop = self.count_stop + 1
-
+                # print(self.count_stop)
                 # if (self.count_stop>15000 and self.count_stop<18000):
                 #     self.QR.PF_var.stop_flag = 1
 
@@ -383,15 +383,13 @@ class NodeAttCtrl(Node):
                 #.. waypoint regeneration
                 if (self.QR.PF_var.reWP_flag == 1):
                     self.QR.PF_var.reWP_flag      = 0    
-                    self.WP.WPs                   = self.WP.reWPs
+                    # self.WP.WPs                   = self.WP.reWPs
                     self.QR.PF_var.WP_idx_heading = 1
                     self.QR.PF_var.WP_idx_passed  = 0
-                    # self.WP.insert_WP(0, np.array([self.QR.state_var.Ri[0], self.QR.state_var.Ri[1], -self.WP.waypoint_z[self.QR.PF_var.WP_idx_heading]-2]))
-                    self.WP.insert_WP(0, self.QR.state_var.Ri)
-                    
                     # self.WP.insert_WP(0, self.QR.state_var.Ri)
-
-                    
+                    # self.WP.insert_WP(0, self.QR.state_var.Ri)
+                # self.get_logger().info('self.QR.PF_var.WP_idx_passed: {0}'.format(self.QR.PF_var.WP_idx_passed))
+                self.get_logger().info(str(self.WP.WPs))
                 #.. state variables updates (from px4)
                 self.QR.update_states(self.est_state.pos_NED, self.est_state.vel_NED, self.est_state.eul_ang_rad, self.est_state.accel_xyz)
                 
@@ -405,7 +403,7 @@ class NodeAttCtrl(Node):
                 self.QR.guid_Ai_cmd(self.WP.WPs.shape[0], self.QR.guid_var.MPPI_ctrl_input)  # based on the geometry and VT     
                 self.QR.guid_compensate_Ai_cmd()                                             # gravity, disturbance rejection
                 self.QR.guid_NDO_for_Ai_cmd()                                                # NDO for disturbance estimation
-                self.QR.guid_convert_Ai_cmd_to_thrust_and_att_ang_cmd(self.WP.WPs, self.flightlogFile)
+                self.QR.guid_convert_Ai_cmd_to_thrust_and_att_ang_cmd(self.WP.WPs)
                 self.QR.guid_convert_att_ang_cmd_to_qd_cmd()
                 
                 #.. guidance command

@@ -38,7 +38,7 @@ class Plotter(Node):
             GlobalWaypointSetpoint,
             "/global_waypoint_setpoint_to_plotter",
             self.global_waypoint_callback,
-            10,
+            1,
         )
 
         # Subscriber for local waypoint setpoint from path planning
@@ -46,7 +46,7 @@ class Plotter(Node):
             LocalWaypointSetpoint,
             "/local_waypoint_setpoint_to_plotter",
             self.local_waypoint_callback,
-            10,
+            1,
         )
 
         # Subscriber for vehicle local position from px4
@@ -58,7 +58,7 @@ class Plotter(Node):
         )
 
         self.state_subscriber = self.create_subscription(
-            Bool, "/controller_state", self.state_callback, 10
+            Bool, "/controller_state", self.state_callback, 1
         )
 
         # self.current_heading_waypoint_subscriber =   self.create_subscription(
@@ -69,7 +69,7 @@ class Plotter(Node):
             Float64MultiArray,
             '/min_distance',
             self.min_distance_callback,
-            10,
+            1,
         )
         # endregion
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

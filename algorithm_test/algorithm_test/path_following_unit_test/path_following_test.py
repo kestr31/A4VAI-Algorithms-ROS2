@@ -8,7 +8,7 @@ import os
 import rclpy
 from rclpy.node import Node
 
-from ..lib.common_fuctions import set_initial_variables, state_logger, publish_to_plotter
+from ..lib.common_fuctions import set_initial_variables, state_logger, publish_to_plotter, set_wp
 from ..lib.publish_function import PubFuncHeartbeat, PubFuncPX4, PubFuncWaypoint, PubFuncPlotter
 from ..lib.timer import HeartbeatTimer, MainTimer, CommandPubTimer
 from ..lib.subscriber import PX4Subscriber, FlagSubscriber, CmdSubscriber, EtcSubscriber
@@ -108,8 +108,9 @@ class PathFollowingTest(Node):
 
         # if the vehicle was taken off send local waypoint to path following and wait in position mode
         if self.mode_flag.is_takeoff == True and self.mode_flag.pf_recieved_lw == False:
-            self.pub_func_waypoint.local_waypoint_publish(True)
             self.pub_func_px4.publish_vehicle_command(self.modes.prm_position_mode)
+            set_wp(self)
+            self.pub_func_waypoint.local_waypoint_publish(True)
             publish_to_plotter(self)
             
         # check if path following is recieved the local waypoint

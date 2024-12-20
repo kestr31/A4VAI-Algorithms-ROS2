@@ -117,19 +117,30 @@ def lidar_callback(state_var, guid_var, mode_flag, ca_var, pub_func, pc_msg):
 
             if mode_flag.is_ca == True:
                 if ca_var.lidar_min_distance > 7:
-                    x = state_var.x
-                    y = state_var.y
-                    z = state_var.z
 
-                    guid_var.waypoint_x = guid_var.waypoint_x[guid_var.cur_wp-1:]
-                    guid_var.waypoint_y = guid_var.waypoint_y[guid_var.cur_wp-1:]
-                    guid_var.waypoint_z = guid_var.waypoint_z[guid_var.cur_wp-1:]
+                    guid_var.waypoint_x = guid_var.waypoint_x[guid_var.cur_wp:]
+                    guid_var.waypoint_y = guid_var.waypoint_y[guid_var.cur_wp:]
+                    guid_var.waypoint_z = guid_var.waypoint_z[guid_var.cur_wp:]
+
+                    guid_var.waypoint_x = list(np.insert(guid_var.waypoint_x, 0, state_var.x))
+                    guid_var.waypoint_x = list(np.insert(guid_var.waypoint_x, 0, state_var.x))
+                    guid_var.waypoint_y = list(np.insert(guid_var.waypoint_y, 0, state_var.y))
+                    guid_var.waypoint_y = list(np.insert(guid_var.waypoint_y, 0, state_var.y))
+                    guid_var.waypoint_z = list(np.insert(guid_var.waypoint_z, 0, state_var.z))
+                    guid_var.waypoint_z = list(np.insert(guid_var.waypoint_z, 0, state_var.z))
+                    guid_var.waypoint_x = list(np.insert(guid_var.waypoint_x, 0, state_var.x))
+                    guid_var.waypoint_x = list(np.insert(guid_var.waypoint_x, 0, state_var.x))
+                    guid_var.waypoint_y = list(np.insert(guid_var.waypoint_y, 0, state_var.y))
+                    guid_var.waypoint_y = list(np.insert(guid_var.waypoint_y, 0, state_var.y))
+                    guid_var.waypoint_z = list(np.insert(guid_var.waypoint_z, 0, state_var.z))
+                    guid_var.waypoint_z = list(np.insert(guid_var.waypoint_z, 0, state_var.z))
+
                     # print(guid_var.waypoint_x[guid_var.cur_wp:])
                     # print(guid_var.cur_wp)
 
-                    guid_var.real_wp_x = [x] + guid_var.waypoint_x
-                    guid_var.real_wp_y = [y] + guid_var.waypoint_y
-                    guid_var.real_wp_z = [z] + guid_var.waypoint_z
+                    guid_var.real_wp_x = guid_var.waypoint_x
+                    guid_var.real_wp_y = guid_var.waypoint_y
+                    guid_var.real_wp_z = guid_var.waypoint_z
 
                     pub_func.local_waypoint_publish(False)
 

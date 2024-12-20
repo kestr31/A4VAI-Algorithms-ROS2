@@ -9,7 +9,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.clock import Clock
 
-from ..lib.common_fuctions import set_initial_variables, state_logger, publish_to_plotter
+from ..lib.common_fuctions import set_initial_variables, state_logger, publish_to_plotter, set_wp
 from ..lib.publish_function import PubFuncHeartbeat, PubFuncPX4, PubFuncWaypoint, PubFuncPlotter
 from ..lib.timer import HeartbeatTimer, MainTimer, CommandPubTimer
 from ..lib.subscriber import PX4Subscriber, FlagSubscriber, CmdSubscriber, HeartbeatSubscriber, MissionSubscriber, EtcSubscriber
@@ -98,8 +98,6 @@ class CAPFIntegrationTest(Node):
     # --------------------------------------------------------------------------------------------#
     # region MAIN CODE
     def offboard_control_main(self):
-        # self.get_logger().info(str(self.guid_var.cur_wp))
-        # self.get_logger().info(str(self.guid_var.waypoint_x[self.guid_var.cur_wp]))
         # self.get_logger().info(str(self.guid_var.waypoint_x))
         if self.offboard_var.ca_heartbeat == True and self.offboard_var.pf_heartbeat == True:
             
@@ -123,6 +121,7 @@ class CAPFIntegrationTest(Node):
                 self.mode_flag.is_takeoff = False
                 self.mode_flag.is_pp_mode = True
                 self.get_logger().info('Vehicle is reached to initial position')
+                set_wp(self)
 
             if self.mode_flag.is_pp_mode == True:
                 self.pub_func_waypoint.local_waypoint_publish(True)
@@ -136,7 +135,6 @@ class CAPFIntegrationTest(Node):
             # check if path following is recieved the local waypoint
             if self.mode_flag.is_offboard == True and self.mode_flag.pf_done == False:
                 publish_to_plotter(self)
-                
                 if self.mode_flag.is_pf == True:
                     self.offboard_mode.attitude = True
                     self.offboard_mode.velocity = False
@@ -163,7 +161,7 @@ class CAPFIntegrationTest(Node):
                 self.pub_func_px4.publish_vehicle_command(self.modes.prm_disarm_mode)    
                 self.mode_flag.is_disarmed = True
                 self.get_logger().info('Vehicle is disarmed')  
-        
+            # self.get_logger().info(str(self.ca_var.depth_min_distance))
             state_logger(self)
     # endregion
 

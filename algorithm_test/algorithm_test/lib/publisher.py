@@ -95,7 +95,7 @@ class PlotterPublisher:
         self.node.global_waypoint_publisher_to_plotter = self.node.create_publisher(
             GlobalWaypointSetpoint,
             "/global_waypoint_setpoint_to_plotter",
-            10
+            1
         )
     
     def declareLocalWaypointPublisherToPlotter(self):

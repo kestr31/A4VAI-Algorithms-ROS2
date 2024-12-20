@@ -18,7 +18,7 @@ from rclpy.clock import Clock
 
 
 def state_logger(self):
-    flightlog = "%f %f %f %f %f %f %f %f %f %f %f %f\n" % (
+    flightlog = "%f %f %f %f %f %f %f %f %f %f %f \n" % (
         int(Clock().now().nanoseconds / 1000),
         self.state_var.x,
         self.state_var.y,
@@ -33,7 +33,6 @@ def state_logger(self):
         self.state_var.yaw,
 
         self.guid_var.cur_wp,
-        self.guid_var.waypoint_x[0]
         # self.guid_var.waypoint_y,
         # self.guid_var.waypoint_z,
         
@@ -66,17 +65,20 @@ def set_initial_variables(classIn, dir, sim_name):
         depth=10
     )
 
-    set_wp(classIn)
+    
     set_logging_file(classIn)
 
 def set_wp(self):
 
     wp_path = os.path.join(self.sim_var.dir, "wp.csv")
     data = pd.read_csv(wp_path)
+    self.state_var.x = data["x"][0]
+    self.state_var.y = data["y"][0]
+    self.state_var.z = data["z"][0]
 
-    self.guid_var.waypoint_x = list(data["x"][1:])
-    self.guid_var.waypoint_y = list(data["y"][1:])
-    self.guid_var.waypoint_z = list(data["z"][1:])
+    self.guid_var.waypoint_x = list(data["x"])
+    self.guid_var.waypoint_y = list(data["y"])
+    self.guid_var.waypoint_z = list(data["z"])
     
     self.guid_var.real_wp_x = list(data["x"])
     self.guid_var.real_wp_y = list(data["y"])
