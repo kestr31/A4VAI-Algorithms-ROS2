@@ -66,6 +66,7 @@ class ModeFlag:
         self.is_ca              = False
         self.is_pf              = False
         self.foward_clear       = False
+        self.is_manual          = False
         
 class SimulationVariable:
     def __init__(self, sim_name, dir):
