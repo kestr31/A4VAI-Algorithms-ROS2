@@ -378,8 +378,8 @@ class MPPI_Guidance_Modules():
                     path_following_required_info__VTP_decision(PF_var_dist_to_path, \
                         GnC_param_virtual_target_distance, PF_var_point_closest_on_path_i, PF_var_WP_idx_passed,
                         WP_WPs, PF_var_VT_Ri);
-                    path_following_required_info__takeoff_to_first_WP(WP_WPs, \
-                        state_var_Ri, PF_var_WP_idx_passed, GnC_param_dist_change_first_WP, PF_var_VT_Ri);
+                //     path_following_required_info__takeoff_to_first_WP(WP_WPs, \
+                //         state_var_Ri, PF_var_WP_idx_passed, GnC_param_dist_change_first_WP, PF_var_VT_Ri);
                 }
                     
                 // weight by variance of GPR

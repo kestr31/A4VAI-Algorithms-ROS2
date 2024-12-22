@@ -18,6 +18,7 @@ from px4_msgs.msg import VehicleLocalPosition
 from std_msgs.msg import Bool
 from std_msgs.msg import Int32
 from std_msgs.msg import Float32
+from std_msgs.msg import Float64MultiArray
 
 # submodule for initial variables
 from .initVar import *
@@ -35,17 +36,17 @@ class Plotter(Node):
         # Subscriber for global waypoint setpoint from controller
         self.global_waypoint_subscriber = self.create_subscription(
             GlobalWaypointSetpoint,
-            "/global_waypoint_setpoint",
+            "/global_waypoint_setpoint_to_plotter",
             self.global_waypoint_callback,
-            10,
+            1,
         )
 
         # Subscriber for local waypoint setpoint from path planning
         self.local_waypoint_subscriber = self.create_subscription(
             LocalWaypointSetpoint,
-            "/local_waypoint_setpoint_from_PP",
+            "/local_waypoint_setpoint_to_plotter",
             self.local_waypoint_callback,
-            10,
+            1,
         )
 
         # Subscriber for vehicle local position from px4
@@ -57,18 +58,18 @@ class Plotter(Node):
         )
 
         self.state_subscriber = self.create_subscription(
-            Bool, "/controller_state", self.state_callback, 10
+            Bool, "/controller_state", self.state_callback, 1
         )
 
-        self.current_heading_waypoint_subscriber =   self.create_subscription(
-            Int32, '/current_heading_waypoint', self.current_heading_waypoint_callback, 1)
+        # self.current_heading_waypoint_subscriber =   self.create_subscription(
+        #     Float32, '/heading', self.current_heading_waypoint_callback, 1)
 
 
         self.min_distance_subscriber = self.create_subscription(
-            Float32,
+            Float64MultiArray,
             '/min_distance',
             self.min_distance_callback,
-            10,
+            1,
         )
         # endregion
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -77,7 +78,7 @@ class Plotter(Node):
         # region timer
 
         # update plot timer
-        period_update_plot = 0.1
+        period_update_plot = 0.3
         self.timer = self.create_timer(period_update_plot, self.update_plot)
 
         # endregion
@@ -113,7 +114,7 @@ class Plotter(Node):
         self.vehicle_z = np.append(self.vehicle_z, vehicle_z).flatten()
 
     def state_callback(self, msg):
-        self.state = msg.data
+        self.is_ca = msg.data
 
     def current_heading_waypoint_callback(self, msg):
         if msg.data != self.current_heading_waypoint_callback_counter:
@@ -124,19 +125,20 @@ class Plotter(Node):
         self.get_logger().info(str(msg.data))
         self.get_logger().info(str(self.current_heading_waypoint_callback_counter))
         self.get_logger().info(str(self.waypoint_x))
+
     def min_distance_callback(self, msg):
-        self.min_distance = msg.data
+        if msg.data[0] > 7.0:
+            self.min_distance = msg.data[1]
+        else:
+            self.min_distance = msg.data[0]
 
     # endregion
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-    # Draw the updated plot
+    # region MAIN CODE
     def update_plot(self):
-
         # check if global and local waypoints are set
         if self.global_waypoint_set == True and self.local_waypoint_set == True:
-
-            # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            # ----------------------------------------------------------------------------------------#
             # region Plot 1 full trajectory
 
             # Clear the previous plot
@@ -162,6 +164,7 @@ class Plotter(Node):
             for i, (x, y) in enumerate(zip(self.waypoint_x, self.waypoint_y)):
                 self.ax1.text(x, y, str(i), fontsize=9, ha='right', color='blue')
 
+            # Plot local waypoint path with red color line
             self.ax1.plot(
                 self.waypoint_x,
                 self.waypoint_y,
@@ -191,7 +194,7 @@ class Plotter(Node):
             # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
             # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-            # region Plot 2 vihicle fixed trajectory
+            # # region Plot 2 vihicle fixed trajectory
 
             # Clear the previous plot
             self.ax2.clear()
@@ -265,26 +268,26 @@ class Plotter(Node):
             self.ax2.grid()
 
             # 텍스트를 추가할 위치 (x, y) 좌표
-            x_position = x_center  # x축에서의 위치 (0~1)
-            y_position = y_center + 10  # y축에서의 위치 (0~1)
-            if self.state == True:
+            # x_position = x_center  # x축에서의 위치 (0~1)
+            # y_position = y_center + 10  # y축에서의 위치 (0~1)
+            if self.is_ca == True:
                 self.ax2.text(
-                    x_center,
-                    y_center - 7,
+                    self.vehicle_x[-1],
+                    self.vehicle_y[-1] - 7,
                     "Coliision Avoidance",
-                    fontsize=12,
+                    fontsize=20,
                     ha="center",
                 )
                 self.ax2.text(
-                    x_center,
-                    y_center - 9,
+                    self.vehicle_x[-1],
+                    self.vehicle_y[-1] - 9,
                     "Depth min distance    :" + str(self.min_distance),
                     fontsize=10,
                     ha="center",
                 )
             else:
                 self.ax2.text(
-                    x_center, y_center - 5, "Path Following", fontsize=12, ha="center"
+                    self.vehicle_x[-1], self.vehicle_y[-1] - 7, "Path Following", fontsize=20, ha="center"
                 )
 
             # endregion

@@ -40,9 +40,14 @@ def distance_to_path(WP_WPs, QR_WP_idx_heading, QR_Ri, QR_point_closest_on_path_
 def check_waypoint(WP_WPs, QR_WP_idx_heading, QR_Ri, QR_distance_change_WP):
     Rqw2i       =   WP_WPs[QR_WP_idx_heading] - QR_Ri
     mag_Rqw2i   =   np.linalg.norm(Rqw2i)
+
+    PF_done     =   False
     if mag_Rqw2i < QR_distance_change_WP:
-        QR_WP_idx_heading = min(QR_WP_idx_heading + 1, WP_WPs.shape[0] - 1)
-    return QR_WP_idx_heading
+        QR_WP_idx_heading = QR_WP_idx_heading + 1
+        if QR_WP_idx_heading == WP_WPs.shape[0]:
+            PF_done = True
+            QR_WP_idx_heading = min(QR_WP_idx_heading, WP_WPs.shape[0] - 1)
+    return QR_WP_idx_heading, PF_done
 
 #.. VTP_decision
 def VTP_decision(dist_to_path, QR_virtual_target_distance, QR_point_closest_on_path_i, QR_WP_idx_passed, WP_WPs):

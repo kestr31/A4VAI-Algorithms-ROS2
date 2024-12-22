@@ -71,12 +71,12 @@ class Quadrotor_6DOF():
 
         self.PF_var.dist_to_path, self.PF_var.point_closest_on_path_i, self.PF_var.WP_idx_passed = path_following_required_info.distance_to_path(
             WP_WPs, self.PF_var.WP_idx_heading, self.state_var.Ri, self.PF_var.point_closest_on_path_i, self.PF_var.WP_idx_passed)
-        self.PF_var.WP_idx_heading = path_following_required_info.check_waypoint(
+        self.PF_var.WP_idx_heading, self.PF_var.PF_done= path_following_required_info.check_waypoint(
             WP_WPs, self.PF_var.WP_idx_heading, self.state_var.Ri, self.GnC_param.distance_change_WP)
         self.PF_var.VT_Ri = path_following_required_info.VTP_decision(
             self.PF_var.dist_to_path, self.GnC_param.virtual_target_distance, self.PF_var.point_closest_on_path_i, self.PF_var.WP_idx_passed, WP_WPs)
-        self.PF_var.VT_Ri = path_following_required_info.takeoff_to_first_WP(
-            WP_WPs, self.state_var.Ri, self.PF_var.WP_idx_passed, self.GnC_param.dist_change_first_WP, self.PF_var.VT_Ri)
+        # self.PF_var.VT_Ri = path_following_required_info.takeoff_to_first_WP(
+        #     WP_WPs, self.state_var.Ri, self.PF_var.WP_idx_passed, self.GnC_param.dist_change_first_WP, self.PF_var.VT_Ri)
         
         # 20240914 diy 
         if (self.PF_var.stop_flag == 1):
@@ -143,7 +143,14 @@ class Quadrotor_6DOF():
             self.guid_var.Ai_rotor_drag)
         pass
 
-    #.. guid_convert_Ai_cmd_to_thrust_and_att_ang_cmd
+    # #.. currunt_guid_convert_Ai_cmd_to_thrust_and_att_ang_cmd
+    # def guid_convert_Ai_cmd_to_thrust_and_att_ang_cmd(self, WP_WPs):
+    #     self.guid_var.T_cmd, self.guid_var.norm_T_cmd, self.guid_var.att_ang_cmd = guidance_path_following.convert_Ai_cmd_to_thrust_and_att_ang_cmd(
+    #         self.state_var.cI_B, self.guid_var.Ai_cmd_compensated, self.physical_param.mass, self.physical_param.T_max, 
+    #         WP_WPs, self.PF_var.WP_idx_heading, self.PF_var.VT_Ri, self.state_var.Ri, self.state_var.att_ang, self.GnC_param.del_psi_cmd_limit, self.state_var.Vi)
+    #     pass
+
+    #.. prev_guid_convert_Ai_cmd_to_thrust_and_att_ang_cmd
     def guid_convert_Ai_cmd_to_thrust_and_att_ang_cmd(self, WP_WPs):
         self.guid_var.T_cmd, self.guid_var.norm_T_cmd, self.guid_var.att_ang_cmd = guidance_path_following.convert_Ai_cmd_to_thrust_and_att_ang_cmd(
             self.state_var.cI_B, self.guid_var.Ai_cmd_compensated, self.physical_param.mass, self.physical_param.T_max, 

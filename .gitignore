@@ -1,22 +1,5 @@
 # pycache
-collision_avoidance/collision_avoidance/__pycache__/
-controller/controller/__pycache__/
-pathplanning/pathplanning/__pycache__/
-common_interfaces/sensor_msgs_py/sensor_msgs_py/__pycache__
-pathfollowing/pathfollowing/__pycache__/
-pathfollowing/pathfollowing/etc_class/__pycache__
-pathfollowing/pathfollowing/flight_functions/__pycache__
-pathfollowing/pathfollowing/models/__pycache__
-pathfollowing/pathfollowing/necessary_settings/__pycache__
-pub_depth/pub_depth/__pycache__
-plotter/plotter/__pycache__
-algorithm_test/algorithm_test/__pycache__
-algorithm_test/algorithm_test/collosion_avoidance_unit_test/__pycache__
-algorithm_test/algorithm_test/lib/__pycache__
-
-algorithm_test/algorithm_test/collosion_avoidance_unit_test/log.txt
-algorithm_test/algorithm_test/collosion_avoidance_unit_test/sample1.csv
-
+__pycache__
 # result images
 pathplanning/pathplanning/Results_Images/SSAC_Result_biary.png
 pathplanning/pathplanning/Results_Images/SAC_Result_og.pn
