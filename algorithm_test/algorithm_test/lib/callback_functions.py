@@ -21,12 +21,14 @@ def CA2Control_callback(veh_vel_set, stateVar, ca_var, msg):
 
     total_body_cmd = np.array([msg.linear.x + 2.0, msg.linear.y, msg.linear.z])
 
-    if total_body_cmd[0] > 3.0:
-        total_body_cmd[0] = 3.0
-    if total_body_cmd[1] > 3.0:
-        total_body_cmd[1] = 3.0
-    if total_body_cmd[2] > 3.0:
-        total_body_cmd[2] = 3.0
+    static_value = 3.0
+
+    if total_body_cmd[0] > static_value:
+        total_body_cmd[0] = static_value
+    if total_body_cmd[1] > static_value:
+        total_body_cmd[1] = static_value
+    if total_body_cmd[2] > static_value:
+        total_body_cmd[2] = static_value
 
     veh_vel_set.body_velocity = total_body_cmd
     veh_vel_set.ned_velocity = BodytoNED(veh_vel_set.body_velocity, stateVar.dcm_b2n)

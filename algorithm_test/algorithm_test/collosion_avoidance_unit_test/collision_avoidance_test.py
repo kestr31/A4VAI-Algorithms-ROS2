@@ -150,28 +150,9 @@ class CollisionAvoidanceTest(Node):
     # ----------------------------------------------------------------------------------------#
     # region CALCULATION FUNC
     def set_forward_cmd(self):
-        # self.veh_vel_set.position = [-27.0, 27.0, -5.0]
-        # self.veh_vel_set.ned_velocity = np.nan * np.ones(3)
-        # self.veh_vel_set.acceleration = [np.NaN, np.NaN, np.NaN]
-        # self.veh_vel_set.jerk = [np.NaN, np.NaN, np.NaN]
-
-        # self.veh_vel_set.yaw = np.nan
-        # self.veh_vel_set.yawspeed = np.nan
-
-        # self.veh_vel_set.body_velocity = np.nan * np.ones(3)
-
-        self.veh_vel_set.body_velocity = np.array([10, 0, 0])
-        # self.veh_vel_set.ned_velocity = np.array([3, 0, 0])
-
+        self.veh_vel_set.body_velocity = np.array([3, 0, 0])
         self.veh_vel_set.ned_velocity = BodytoNED(self.veh_vel_set.body_velocity, self.state_var.dcm_b2n)
-        # self.veh_vel_set.yawspeed = 0.0
-
         self.veh_vel_set.yaw = 135.0 * np.pi / 180.0
-        # self.veh_vel_set.yawspeed = 0.0
-
-        # self.veh_vel_set.body_velocity = np.nan * np.ones(3)
-
-
     # endregion
     # ----------------------------------------------------------------------------------------#
 
