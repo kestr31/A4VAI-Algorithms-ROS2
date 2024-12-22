@@ -49,7 +49,7 @@ class CAPFIntegrationTest(Node):
         self.pub_plotter.declareHeadingPublisherToPlotter()
         self.pub_plotter.declareStatePublisherToPlotter()
         self.pub_plotter.declareMinDistancePublisherToPlotter()
-        # end region
+        # endregion
         # ----------------------------------------------------------------------------------------#
         # region PUB FUNC
         self.pub_func_heartbeat = PubFuncHeartbeat(self)
