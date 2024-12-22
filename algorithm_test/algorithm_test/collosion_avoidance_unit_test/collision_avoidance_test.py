@@ -90,6 +90,7 @@ class CollisionAvoidanceTest(Node):
         self.timer_heartbeat.declarePathPlanningHeartbeatTimer()
         self.timer_heartbeat.declarePathFollowingHeartbeatTimer()
         # endregion
+        self.set_forward_cmd()
     # ----------------------------------------------------------------------------------------#
     # region MAIN CODE
     def offboard_control_main(self):
@@ -127,7 +128,7 @@ class CollisionAvoidanceTest(Node):
             # if the vehicle was taken off send local waypoint to path following and wait in position mode
             if not self.mode_flag.is_takeoff:
                 
-                publish_to_plotter(self)
+                # publish_to_plotter(self)
 
                 if not self.mode_flag.is_ca:
                     self.mode_flag.is_manual = True
@@ -135,10 +136,11 @@ class CollisionAvoidanceTest(Node):
                     self.mode_flag.is_manual = False
 
                 if self.mode_flag.is_manual:
-                    self.set_forward_cmd()
-                    self.get_logger().info("Going forward")
+                    self.get_logger().info("Going to designated position")
                 else:
                     self.get_logger().info("Collision avoidance mode")
+                    
+                self.get_logger().info(str(self.veh_vel_set.ned_velocity))
 
                 self.pub_func_px4.publish_offboard_control_mode(self.offboard_mode)
                 self.pub_func_px4.publish_vehicle_command(self.modes.prm_offboard_mode)
@@ -148,9 +150,28 @@ class CollisionAvoidanceTest(Node):
     # ----------------------------------------------------------------------------------------#
     # region CALCULATION FUNC
     def set_forward_cmd(self):
-        self.veh_vel_set.body_velocity = np.array([3, 0, 0])
+        # self.veh_vel_set.position = [-27.0, 27.0, -5.0]
+        # self.veh_vel_set.ned_velocity = np.nan * np.ones(3)
+        # self.veh_vel_set.acceleration = [np.NaN, np.NaN, np.NaN]
+        # self.veh_vel_set.jerk = [np.NaN, np.NaN, np.NaN]
+
+        # self.veh_vel_set.yaw = np.nan
+        # self.veh_vel_set.yawspeed = np.nan
+
+        # self.veh_vel_set.body_velocity = np.nan * np.ones(3)
+
+        self.veh_vel_set.body_velocity = np.array([10, 0, 0])
+        # self.veh_vel_set.ned_velocity = np.array([3, 0, 0])
+
         self.veh_vel_set.ned_velocity = BodytoNED(self.veh_vel_set.body_velocity, self.state_var.dcm_b2n)
-        self.veh_vel_set.yawspeed = 0.0
+        # self.veh_vel_set.yawspeed = 0.0
+
+        self.veh_vel_set.yaw = 135.0 * np.pi / 180.0
+        # self.veh_vel_set.yawspeed = 0.0
+
+        # self.veh_vel_set.body_velocity = np.nan * np.ones(3)
+
+
     # endregion
     # ----------------------------------------------------------------------------------------#
 
