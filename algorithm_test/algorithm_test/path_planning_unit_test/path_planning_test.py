@@ -9,11 +9,11 @@ from PIL import Image
 # ROS libraries
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import Bool
 
 # custom msgs libararies
 from custom_msgs.msg import GlobalWaypointSetpoint
 from custom_msgs.msg import LocalWaypointSetpoint
-from custom_msgs.msg import Heartbeat
 
 
 class PathPlanningTest(Node):
@@ -59,19 +59,19 @@ class PathPlanningTest(Node):
         self.ax2 = self.fig.add_subplot(122, projection='3d') 
 
         self.controller_heartbeat_publisher = self.create_publisher(
-            Heartbeat,
+            Bool,
             '/controller_heartbeat',
             10
         )
 
         self.path_following_heartbeat_publisher = self.create_publisher(
-            Heartbeat,    
+            Bool,    
             '/path_following_heartbeat', 
             10
         )
         
         self.collision_avoidance_heartbeat_publisher  = self.create_publisher(
-            Heartbeat,    
+            Bool,    
             '/collision_avoidance_heartbeat', 
             10
         )
@@ -215,7 +215,7 @@ class PathPlanningTest(Node):
         self.get_logger().info("plot")
         self.get_logger().info("======================================================")
 
-        plt.axis('equal')
+        self.ax2.set_box_aspect([1, 1, 1])
         self.ax2.set_zlim(0, 100)
 
         plt.tight_layout()
@@ -227,18 +227,18 @@ class PathPlanningTest(Node):
 
     # heartbeat publish
     def publish_collision_avoidance_heartbeat(self):
-        msg = Heartbeat()
-        msg.heartbeat = True
+        msg = Bool()
+        msg.data = True
         self.collision_avoidance_heartbeat_publisher.publish(msg)
 
     def publish_path_following_heartbeat(self):
-        msg = Heartbeat()
-        msg.heartbeat = True
+        msg = Bool()
+        msg.data = True
         self.path_following_heartbeat_publisher.publish(msg)
 
     def publish_controller_heartbeat(self):
-        msg = Heartbeat()
-        msg.heartbeat = True
+        msg = Bool()
+        msg.data = True
         self.controller_heartbeat_publisher.publish(msg)
 
 def main(args=None):
