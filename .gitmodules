@@ -1,0 +1,3 @@
+[submodule "pathplanning"]
+	path = pathplanning
+	url = https://github.com/Brightestsama/A4VAI-PathPlanning.git
