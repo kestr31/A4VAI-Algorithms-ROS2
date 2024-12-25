@@ -142,7 +142,7 @@ class PubFuncPlotter:
 
     def publish_global_waypoint_to_plotter(self, guid_var):
         msg = GlobalWaypointSetpoint()
-        msg.start_point = [guid_var.init_pos[0], guid_var.init_pos[0], guid_var.init_pos[0]]
+        msg.start_point = [0., guid_var.init_pos[2], 0.]
         msg.goal_point = [guid_var.waypoint_x[-1], guid_var.waypoint_z[-1], guid_var.waypoint_y[-1]]
         self.node.global_waypoint_publisher_to_plotter.publish(msg)
 
