@@ -23,8 +23,8 @@ class PathPlanningTest(Node):
         ############################################################################################################
         # input: start_point, goal_point
         # set start and goal point
-        self.start_point = [200.0, 400.0, 25.0]
-        self.goal_point = [600.0, 200.0, 25.0]
+        self.start_point = [200.0, 400.0, 11.0]
+        self.goal_point = [600.0, 200.0, 14.0]
         ############################################################################################################
 
         # Publisher for global waypoint setpoint
