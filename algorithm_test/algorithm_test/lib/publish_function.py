@@ -61,7 +61,7 @@ class PubFuncPX4:
             self.node.vehicle_attitude_setpoint_publisher.publish(msg)
 
     def publish_vehicle_velocity_setpoint(self, mode_flag, veh_vel_set):
-        if mode_flag.is_ca == True:
+        if mode_flag.is_ca == True or mode_flag.is_manual == True:
             msg = TrajectorySetpoint()
             msg.timestamp = int(Clock().now().nanoseconds / 1000)  # time in microseconds
             msg.position        = veh_vel_set.position

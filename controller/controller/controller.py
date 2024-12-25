@@ -14,7 +14,6 @@ from px4_msgs.msg import VehicleCommand, OffboardControlMode , TrajectorySetpoin
 from px4_msgs.msg import VehicleLocalPosition , VehicleAttitude, VehicleAngularVelocity, VehicleStatus, VehicleGlobalPosition
 
 from custom_msgs.msg import LocalWaypointSetpoint, ConveyLocalWaypointComplete
-from custom_msgs.msg import Heartbeat
 from geometry_msgs.msg import Twist 
 from sensor_msgs.msg import PointCloud2
 
