@@ -24,9 +24,9 @@ def state_logger(self):
         self.state_var.y,
         self.state_var.z,
         # ned velocity [m/s]
-        self.state_var.vx_b,
-        self.state_var.vy_b,
-        self.state_var.vz_b,
+        self.state_var.vx,
+        self.state_var.vy,
+        self.state_var.vz,
         # attitude [rad]
         self.state_var.roll,
         self.state_var.pitch,
@@ -123,19 +123,20 @@ def convert_quaternion2euler(w, x, y, z):
 
 # convert Body frame to NED frame
 def BodytoNED(vel_body_cmd, dcm):
-    vel_ned_cmd = (dcm @ vel_body_cmd).tolist()
+    vel_ned_cmd = np.array((dcm @ vel_body_cmd).tolist())
     return vel_ned_cmd
 
 # convert NED frame to Body frame
-def NEDtoBody(vel_ned, dcm):
-    u, v, w = np.array((dcm @ vel_ned).tolist())
-    vel_body = np.array([u, v, w])
-    return vel_body
+def NEDtoBody(self):
+    vel_body = np.array([self.v_x, self.v_y, self.v_z])
+
+    self.u, self.v, self.w = np.array((self.DCM_nb @ vel_body).tolist())
 
 
 # calculate DCM matrix
 #.. get DCM from Euler angle
 def DCM_from_euler_angle( EulerAng ):
+
     # Local Variable 
     spsi            =   math.sin( EulerAng[2] )
     cpsi            =   math.cos( EulerAng[2] )
