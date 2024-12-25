@@ -28,7 +28,7 @@ class CollisionAvoidanceVariable:
         self.depth_min_distance = 0.
         self.lidar_min_distance = 0.
         self.lidar_counter = 0
-        self.yaw_rate_sum = 0.
+        self.sign = 0.
 
 class OffboardVariable:
     def __init__(self):

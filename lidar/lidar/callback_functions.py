@@ -138,7 +138,6 @@ def lidar_callback(state_var, guid_var, mode_flag, ca_var, pub_func, pc_msg):
 
                     mode_flag.is_ca = False
                     mode_flag.is_pf = True
-                    ca_var.yaw_rate_sum = 0
 
 def pf_complete_callback(mode_flag, msg):
     mode_flag.pf_done = msg.data

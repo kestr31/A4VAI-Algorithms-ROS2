@@ -137,7 +137,7 @@ class PathFollowingTest(Node):
             self.pub_func_px4.publish_vehicle_command(self.modes.prm_land_mode)
 
             # check if the vehicle is landed
-            if np.abs(self.state_var.vz) < 0.05 and np.abs(self.state_var.z < 0.05):
+            if np.abs(self.state_var.vz_n) < 0.05 and np.abs(self.state_var.z < 0.05):
                 self.mode_flag.is_landed = True
                 self.get_logger().info('Vehicle is landed')
 
@@ -175,7 +175,7 @@ class PathFollowingTest(Node):
             for i in range(len(msg.waypoint_x)):
                 self.guid_var.waypoint_x.append(float(new_xy[0, i]*400/1024 - new_init_pos[0]))
                 self.guid_var.waypoint_y.append(float(new_xy[1, i]*400/1024 - new_init_pos[1]))
-                self.guid_var.waypoint_z.append(float(msg.waypoint_z[i])) 
+                self.guid_var.waypoint_z.append(float(msg.waypoint_z[i]) + 1) 
             self.guid_var.real_wp_x = self.guid_var.waypoint_x
             self.guid_var.real_wp_y = self.guid_var.waypoint_y
             self.guid_var.real_wp_z = self.guid_var.waypoint_z
