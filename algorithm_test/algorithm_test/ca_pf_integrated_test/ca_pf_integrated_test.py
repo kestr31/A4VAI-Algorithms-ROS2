@@ -15,6 +15,10 @@ from ..lib.timer import HeartbeatTimer, MainTimer, CommandPubTimer
 from ..lib.subscriber import PX4Subscriber, FlagSubscriber, CmdSubscriber, HeartbeatSubscriber, MissionSubscriber, EtcSubscriber
 from ..lib.publisher import PX4Publisher, HeartbeatPublisher, WaypointPublisher, PlotterPublisher
 from ..lib.data_class import *
+
+
+from custom_msgs.msg import StateFlag
+from geometry_msgs.msg import Point
 # ----------------------------------------------------------------------------------------#
 
 class CAPFIntegrationTest(Node):
@@ -38,6 +42,9 @@ class CAPFIntegrationTest(Node):
 
         self.pub_waypoint = WaypointPublisher(self)
         self.pub_waypoint.declareLocalWaypointPublisherToPF()
+
+        self.pub_flag = self.create_publisher(StateFlag, '/mode_flag2collision', 1)
+        self.sub_flag = self.create_subscription(StateFlag, '/mode_flag2control', self.flag_callback, 1)
 
         self.pub_heartbeat = HeartbeatPublisher(self)
         self.pub_heartbeat.declareControllerHeartbeatPublisher()
@@ -65,15 +72,16 @@ class CAPFIntegrationTest(Node):
 
         self.sub_cmd = CmdSubscriber(self)
         self.sub_cmd.declarePFAttitudeSetpointSubscriber(self.veh_att_set)
-        self.sub_cmd.declareCAVelocitySetpointSubscriber(self.veh_vel_set, self.state_var, self.ca_var)
+        self.sub_cmd.declareCAVelocitySetpointSubscriber(self.veh_vel_set, self.state_var)
 
         self.sub_flag = FlagSubscriber(self)
         self.sub_flag.declareConveyLocalWaypointCompleteSubscriber(self.mode_flag)
         self.sub_flag.declarePFCompleteSubscriber(self.mode_flag)
+        # self.waypoint_subscribe = self.create_subscription(Point, "/temp_waypoint", self.waypoint_callback, 1)
 
         self.sub_mission = MissionSubscriber(self)
-        self.sub_mission.declareLidarSubscriber(self.state_var, self.guid_var, self.mode_flag, self.ca_var, self.pub_func_waypoint)
-        self.sub_mission.declareDepthSubscriber(self.mode_flag, self.ca_var)
+        # self.sub_mission.declareLidarSubscriber(self.state_var, self.guid_var, self.mode_flag, self.ca_var, self.pub_func_waypoint)
+        # self.sub_mission.declareDepthSubscriber(self.mode_flag, self.ca_var)
 
         self.sub_etc = EtcSubscriber(self)
         self.sub_etc.declareHeadingWPIdxSubscriber(self.guid_var)
@@ -127,14 +135,17 @@ class CAPFIntegrationTest(Node):
                 self.pub_func_waypoint.local_waypoint_publish(True)
                 self.pub_func_px4.publish_vehicle_command(self.modes.prm_position_mode)
             
-            if self.mode_flag.pf_recieved_lw == True:
+            if self.mode_flag.pf_recieved_lw == True and self.mode_flag.is_offboard == False:
                 self.mode_flag.is_pp_mode = False
                 self.mode_flag.is_offboard = True
                 self.mode_flag.is_pf = True
+                self.get_logger().info('Vehicle is in offboard mode')
 
             # check if path following is recieved the local waypoint
             if self.mode_flag.is_offboard == True and self.mode_flag.pf_done == False:
                 publish_to_plotter(self)
+                self.publish_flags()
+
                 if self.mode_flag.is_pf == True:
                     self.offboard_mode.attitude = True
                     self.offboard_mode.velocity = False
@@ -152,7 +163,7 @@ class CAPFIntegrationTest(Node):
                 self.pub_func_px4.publish_vehicle_command(self.modes.prm_land_mode)
 
                 # check if the vehicle is landed
-                if np.abs(self.state_var.vz) < 0.05 and np.abs(self.state_var.z < 0.05):
+                if np.abs(self.state_var.vz_n) < 0.05 and np.abs(self.state_var.z < 0.05):
                     self.mode_flag.is_landed = True
                     self.get_logger().info('Vehicle is landed')
 
@@ -165,6 +176,68 @@ class CAPFIntegrationTest(Node):
             state_logger(self)
     # endregion
 
+    def flag_callback(self, msg):
+        # self.get_logger().info(f"Flag received: is_pf: {msg.is_pf}, is_ca: {msg.is_ca}") 씨발 누가 쏘는거야
+        self.mode_flag.is_ca = msg.is_ca
+        self.mode_flag.is_pf = msg.is_pf
+        if self.mode_flag.is_pf == True:
+            self.get_logger().info("is_pf is True")
+            z = self.guid_var.waypoint_z[self.guid_var.cur_wp]
+            self.guid_var.waypoint_x = self.guid_var.waypoint_x[self.guid_var.cur_wp:]
+            self.guid_var.waypoint_y = self.guid_var.waypoint_y[self.guid_var.cur_wp:]
+            self.guid_var.waypoint_z = self.guid_var.waypoint_z[self.guid_var.cur_wp:]
+
+            # self.guid_var.waypoint_x = list(np.insert(self.guid_var.waypoint_x, 0, msg.x))
+            # self.guid_var.waypoint_y = list(np.insert(self.guid_var.waypoint_y, 0, msg.y))
+            # self.guid_var.waypoint_z = list(np.insert(self.guid_var.waypoint_z, 0, z))
+
+            self.guid_var.waypoint_x = list(np.insert(self.guid_var.waypoint_x, 0, self.state_var.x))
+            self.guid_var.waypoint_x = list(np.insert(self.guid_var.waypoint_x, 0, self.state_var.x))
+            self.guid_var.waypoint_y = list(np.insert(self.guid_var.waypoint_y, 0, self.state_var.y))
+            self.guid_var.waypoint_y = list(np.insert(self.guid_var.waypoint_y, 0, self.state_var.y))
+            self.guid_var.waypoint_z = list(np.insert(self.guid_var.waypoint_z, 0, self.state_var.z))
+            self.guid_var.waypoint_z = list(np.insert(self.guid_var.waypoint_z, 0, self.state_var.z))
+
+            self.guid_var.real_wp_x = self.guid_var.waypoint_x
+            self.guid_var.real_wp_y = self.guid_var.waypoint_y
+            self.guid_var.real_wp_z = self.guid_var.waypoint_z
+
+            self.pub_func_waypoint.local_waypoint_publish(False)
+
+    def publish_flags(self):
+        msg = StateFlag()
+        msg.is_pf = self.mode_flag.is_pf
+        msg.is_ca = self.mode_flag.is_ca
+        msg.is_offboard = self.mode_flag.is_offboard
+        self.pub_flag.publish(msg)
+
+
+    # def waypoint_callback(self, msg):
+    #     self.get_logger().info("Waypoint received")
+    #     self.mode_flag.is_ca = False
+    #     self.mode_flag.is_pf = True
+
+    #     z = self.guid_var.waypoint_z[self.guid_var.cur_wp]
+    #     self.guid_var.waypoint_x = self.guid_var.waypoint_x[self.guid_var.cur_wp:]
+    #     self.guid_var.waypoint_y = self.guid_var.waypoint_y[self.guid_var.cur_wp:]
+    #     self.guid_var.waypoint_z = self.guid_var.waypoint_z[self.guid_var.cur_wp:]
+
+    #     # self.guid_var.waypoint_x = list(np.insert(self.guid_var.waypoint_x, 0, msg.x))
+    #     # self.guid_var.waypoint_y = list(np.insert(self.guid_var.waypoint_y, 0, msg.y))
+    #     # self.guid_var.waypoint_z = list(np.insert(self.guid_var.waypoint_z, 0, z))
+
+    #     self.guid_var.waypoint_x = list(np.insert(self.guid_var.waypoint_x, 0, self.state_var.x))
+    #     self.guid_var.waypoint_x = list(np.insert(self.guid_var.waypoint_x, 0, self.state_var.x))
+    #     self.guid_var.waypoint_y = list(np.insert(self.guid_var.waypoint_y, 0, self.state_var.y))
+    #     self.guid_var.waypoint_y = list(np.insert(self.guid_var.waypoint_y, 0, self.state_var.y))
+    #     self.guid_var.waypoint_z = list(np.insert(self.guid_var.waypoint_z, 0, self.state_var.z))
+    #     self.guid_var.waypoint_z = list(np.insert(self.guid_var.waypoint_z, 0, self.state_var.z))
+
+    #     self.guid_var.real_wp_x = self.guid_var.waypoint_x
+    #     self.guid_var.real_wp_y = self.guid_var.waypoint_y
+    #     self.guid_var.real_wp_z = self.guid_var.waypoint_z
+
+    #     self.pub_func_waypoint.local_waypoint_publish(False)
 def main(args=None):
     rclpy.init(args=args)
     ca_pf_integration_test = CAPFIntegrationTest()
