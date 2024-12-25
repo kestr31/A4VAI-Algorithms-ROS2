@@ -171,7 +171,7 @@ class NodeAttCtrl(Node):
 
     # receive local waypoint from controller
     def local_waypoint_setpoint_call_back(self,msg):
-        self.get_logger().info("msg.path_planning_complete: {0}".format(msg.path_planning_complete))
+        # self.get_logger().info("msg.path_planning_complete: {0}".format(msg.path_planning_complete))
         
         if msg.path_planning_complete == True:
             self.path_planning_complete = True
@@ -184,7 +184,9 @@ class NodeAttCtrl(Node):
             # self.get_logger().info("                                          ")
             self.local_waypoint_receive_complete_publish()
         elif msg.path_planning_complete == False:
-            self.QR.PF_var.reWP_flag = 1
+            self.QR.PF_var.reWP_flag      = 1
+            # 241223 diy
+            self.QR.PF_var.reWP_flag2mppi = 1
 
             self.WP.set_values(self.wp_type_selection, msg.waypoint_x, msg.waypoint_y, msg.waypoint_z)
             # print("                                          ")
@@ -284,9 +286,10 @@ class NodeAttCtrl(Node):
     #.. publish_MPPI_input_int_Q6
     def publish_MPPI_input_int_Q6(self):
         msg         =   Int32MultiArray()
-        msg.data    =   [self.QR.PF_var.WP_idx_heading, self.QR.PF_var.WP_idx_passed, self.QR.GnC_param.Guid_type]
+        msg.data    =   [self.QR.PF_var.WP_idx_heading, self.QR.PF_var.WP_idx_passed, self.QR.GnC_param.Guid_type, self.QR.PF_var.reWP_flag2mppi]
         self.MPPI_input_int_Q6_publisher_.publish(msg)
         # self.get_logger().info('pub msgs: {0}'.format(msg.data))
+        self.QR.PF_var.reWP_flag2mppi = 0
         pass
     
     #.. publish_MPPI_input_dbl_Q6
@@ -379,15 +382,15 @@ class NodeAttCtrl(Node):
                 #     self.QR.PF_var.stop_flag      = 0
                 # ---------------------------------------------------
 
-                #.. waypoint regeneration
+                #.. waypoint regeneration, initialization 241223 diy
                 if (self.QR.PF_var.reWP_flag == 1):
                     self.QR.PF_var.reWP_flag      = 0    
                     # self.WP.WPs                   = self.WP.reWPs
                     self.QR.PF_var.WP_idx_heading = 1
                     self.QR.PF_var.WP_idx_passed  = 0
+                    self.QR.guid_var.z_NDO        = np.array([0., 0., 0.])
 
                 # self.get_logger().info('self.QR.PF_var.WP_idx_passed: {0}'.format(self.QR.PF_var.WP_idx_passed))
-                # self.get_logger().info(str(self.WP.WPs))
                 #.. state variables updates (from px4)
                 self.QR.update_states(self.est_state.pos_NED, self.est_state.vel_NED, self.est_state.eul_ang_rad, self.est_state.accel_xyz)
                 
@@ -408,7 +411,10 @@ class NodeAttCtrl(Node):
                 self.veh_att_set.thrust_body    =   [0., 0., -self.QR.guid_var.norm_T_cmd]
                 self.veh_att_set.q_d            =   self.QR.guid_var.qd_cmd
 
-                pass
+                # if self.QR.PF_var.WP_idx_heading != (self.WP.WPs.shape[0] - 1):
+                    # self.get_logger().info("mppi_Ax " + str(self.QR.guid_var.MPPI_ctrl_input[1]) +", mppi_eta " + str(self.QR.guid_var.MPPI_ctrl_input[2]))
+
+                # pass
             else :
                 pass
         else:

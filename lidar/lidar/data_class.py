@@ -8,21 +8,20 @@ class StateVariable:
         self.y = 0.
         self.z = 0.
         # ned velocity [m/s]
-        self.vx_n = 0.
-        self.vy_n = 0.
-        self.vz_n = 0.
-        # body velocity [m/s]
-        self.vx_b = 0.
-        self.vy_b = 0.
-        self.vz_b = 0.
+        self.vx = 0.
+        self.vy = 0.
+        self.vz = 0.
         # attitude [rad]
         self.roll = 0.
         self.pitch = 0.
         self.yaw = 0.
+
+        self.heading = 0.
         
         self.dcm_b2n = np.zeros((3, 3))
         self.dcm_n2b = np.zeros((3, 3))
-        
+
+
 class CollisionAvoidanceVariable:
     def __init__(self):
         self.bridge = CvBridge()
@@ -72,8 +71,7 @@ class ModeFlag:
         self.is_ca              = False
         self.is_pf              = False
         self.foward_clear       = False
-        self.is_manual          = False
-             
+        
 class SimulationVariable:
     def __init__(self, sim_name, dir):
         self.sim_name = sim_name
@@ -143,7 +141,7 @@ class VehicleAttitudeSetpointState:
 class VehicleVelocitySetpointState:
     def __init__(self):
         self.position = [np.NaN, np.NaN, np.NaN]
-        self.ned_velocity = [0.0, 0.0, 0.0]
+        self.ned_velocity = np.nan * np.ones(3)
         self.acceleration = [np.NaN, np.NaN, np.NaN]
         self.jerk = [np.NaN, np.NaN, np.NaN]
 

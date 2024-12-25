@@ -64,11 +64,11 @@ class CmdSubscriber(object):
             1,
         )
     
-    def declareCAVelocitySetpointSubscriber(self, veh_vel_set, stateVar):
+    def declareCAVelocitySetpointSubscriber(self, veh_vel_set, stateVar, ca_var):
         self.node.CA_velocity_setpoint_subscriber = self.node.create_subscription(
             Twist,
             "/ca_vel_2_control",
-            lambda msg: CA2Control_callback(veh_vel_set, stateVar, msg),
+            lambda msg: CA2Control_callback(veh_vel_set, stateVar, ca_var, msg),
             1
         )
 
