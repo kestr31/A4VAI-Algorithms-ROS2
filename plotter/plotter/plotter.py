@@ -161,8 +161,8 @@ class Plotter(Node):
                 label="Local Waypoints",
                 s=6,
             )
-            for i, (x, y) in enumerate(zip(self.waypoint_x, self.waypoint_y)):
-                self.ax1.text(x, y, str(i), fontsize=30, ha='right', color='black')
+            # for i, (x, y) in enumerate(zip(self.waypoint_x, self.waypoint_y)):
+            #     self.ax1.text(x, y, str(i), fontsize=30, ha='right', color='black')
 
             # Plot local waypoint path with red color line
             self.ax1.plot(
@@ -387,8 +387,6 @@ class Plotter(Node):
                     label="Vehicle Position",
                     linewidth=4,
                 )
-            for i, (x, y) in enumerate(zip(self.waypoint_x, self.waypoint_y)):
-                self.ax1.text(x, y, str(i), fontsize=9, ha='right', color='blue')
 
                 # 드론의 위치에 따라 시점 고정
                 x_center = self.vehicle_x[-1]
