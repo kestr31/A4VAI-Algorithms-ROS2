@@ -72,7 +72,7 @@ class CAPFIntegrationTest(Node):
 
         self.sub_cmd = CmdSubscriber(self)
         self.sub_cmd.declarePFAttitudeSetpointSubscriber(self.veh_att_set)
-        self.sub_cmd.declareCAVelocitySetpointSubscriber(self.veh_vel_set, self.state_var)
+        self.sub_cmd.declareCAVelocitySetpointSubscriber(self.veh_vel_set, self.state_var, self.ca_var)
 
         self.sub_flag = FlagSubscriber(self)
         self.sub_flag.declareConveyLocalWaypointCompleteSubscriber(self.mode_flag)

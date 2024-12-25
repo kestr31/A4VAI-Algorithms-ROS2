@@ -50,20 +50,20 @@ class CollisionAvoidanceNode(Node):
             if self.mode_flag.is_pf:
                 for obstacle in obstacle_info:
                     azimuth, elevation, distance, x,y,z = obstacle
-                    if distance < 6.0 and np.deg2rad(-15) <= azimuth <= np.deg2rad(15):
+                    if distance < 8.0 and np.deg2rad(-18) <= azimuth <= np.deg2rad(18):
                         
                         self.mode_flag.is_ca = True
                         self.mode_flag.is_pf = False
                         self.publish_flags()
-                        self.publish_obstacle_info(x,y,z)
-                        self.get_logger().info(f"is_ca: distance={distance}, azimuth={np.degrees(azimuth)}")
+                        # self.publish_obstacle_info(x,y,z)
+                        # self.get_logger().info(f"is_ca: distance={distance}, azimuth={np.degrees(azimuth)}")
                         break
 
             if self.mode_flag.is_ca:
                 obstacle_detected = False
                 for obstacle in obstacle_info:
                     azimuth, elevation, distance, x,y,z = obstacle
-                    if distance < 5:
+                    if distance < 4.:
                         obstacle_detected = True
                         break
                     elif np.deg2rad(-30) <= azimuth <= np.deg2rad(30):  
@@ -74,8 +74,8 @@ class CollisionAvoidanceNode(Node):
                     self.mode_flag.is_ca = False
                     self.mode_flag.is_pf = True
                     self.publish_flags()
-                    self.publish_obstacle_info(x,y,z)
-                    self.get_logger().info(f"is_pf: distance={distance}, azimuth={np.degrees(azimuth)}")
+                    # self.publish_obstacle_info(x,y,z)
+                    # self.get_logger().info(f"is_pf: distance={distance}, azimuth={np.degrees(azimuth)}")
  
     def publish_obstacle_info(self, obstacle_x, obstacle_y, obstacle_z):
         msg = Float32MultiArray()

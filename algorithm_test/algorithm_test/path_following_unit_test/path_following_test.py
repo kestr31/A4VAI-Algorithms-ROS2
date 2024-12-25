@@ -126,7 +126,7 @@ class PathFollowingTest(Node):
             self.pub_func_px4.publish_vehicle_command(self.modes.prm_land_mode)
 
             # check if the vehicle is landed
-            if np.abs(self.state_var.vz) < 0.05 and np.abs(self.state_var.z < 0.05):
+            if np.abs(self.state_var.vz_n) < 0.05 and np.abs(self.state_var.z < 0.05):
                 self.mode_flag.is_landed = True
                 self.get_logger().info('Vehicle is landed')
 

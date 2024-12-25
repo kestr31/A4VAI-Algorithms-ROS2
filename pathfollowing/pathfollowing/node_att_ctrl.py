@@ -43,10 +43,6 @@ class NodeAttCtrl(Node):
     def __init__(self):
         super().__init__('node_attitude_control')
 
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        log_path = os.path.join(current_dir, "log.csv")
-        self.flightlogFile = open(log_path, "w")
-
         #.. simulation settings
         self.guid_type_case      =   3       # | 0: Pos. Ctrl     | 1: GL-based  | 2: MPPI-direct | 3: MPPI-GL
         self.wp_type_selection   =   4       # | 0: straight line | 1: rectangle | 2: circle      | 3: designed | 4: path planning solution
@@ -391,6 +387,7 @@ class NodeAttCtrl(Node):
                     self.QR.guid_var.z_NDO        = np.array([0., 0., 0.])
 
                 # self.get_logger().info('self.QR.PF_var.WP_idx_passed: {0}'.format(self.QR.PF_var.WP_idx_passed))
+                # self.get_logger().info('heading_wp_z : {0}'.format(-self.WP.WPs[self.QR.PF_var.WP_idx_heading][2]))
                 #.. state variables updates (from px4)
                 self.QR.update_states(self.est_state.pos_NED, self.est_state.vel_NED, self.est_state.eul_ang_rad, self.est_state.accel_xyz)
                 

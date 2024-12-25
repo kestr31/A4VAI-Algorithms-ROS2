@@ -17,12 +17,16 @@ def PF_Att2Control_callback(veh_att_set, msg):
     veh_att_set.thrust_body[1] = msg.thrust_body[1]
     veh_att_set.thrust_body[2] = msg.thrust_body[2]
 
-def CA2Control_callback(veh_vel_set, stateVar, msg):
-    total_body_cmd = np.array([msg.linear.x +0.8, msg.linear.y, msg.linear.z])
+def CA2Control_callback(veh_vel_set, stateVar, ca_var, msg):
+
+    total_body_cmd = np.array([msg.linear.x + 0.8, msg.linear.y, msg.linear.z])
 
     veh_vel_set.body_velocity = total_body_cmd
     veh_vel_set.ned_velocity = BodytoNED(veh_vel_set.body_velocity, stateVar.dcm_b2n)
-    veh_vel_set.yawspeed = -msg.angular.z
+    if abs(msg.angular.z) > np.deg2rad(45):
+        ca_var.sign = np.sign(-msg.angular.z)
+    veh_vel_set.yawspeed = -msg.angular.z + np.deg2rad(7) + ca_var.sign*np.deg2rad(5)
+
 
 # subscribe convey local waypoint complete flag from path following
 def vehicle_local_position_callback(state_var, msg):
@@ -135,7 +139,6 @@ def lidar_callback(state_var, guid_var, mode_flag, ca_var, pub_func, pc_msg):
 
                     mode_flag.is_ca = False
                     mode_flag.is_pf = True
-                    ca_var.yaw_rate_sum = 0
 
 def pf_complete_callback(mode_flag, msg):
     mode_flag.pf_done = msg.data
